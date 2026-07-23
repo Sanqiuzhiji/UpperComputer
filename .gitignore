@@ -1,0 +1,25 @@
+# CMake / IDE build output
+/cmake-build-*/
+/.codex-diagnostic-build*/
+/build/
+/out/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+build.ninja
+.ninja_deps
+.ninja_log
+compile_commands.json
+
+# CLion local settings
+/.idea/
+
+# MSVC artifacts
+*.obj
+*.pdb
+*.ilk
+*.lib
+*.exp
+*.exe
