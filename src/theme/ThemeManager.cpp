@@ -16,7 +16,7 @@ ThemeMode ThemeManager::mode() const noexcept
 
 QString ThemeManager::modeName() const
 {
-    return m_mode == ThemeMode::Dark ? tr("Dark") : tr("Light");
+    return m_mode == ThemeMode::Dark ? tr("深色") : tr("浅色");
 }
 
 void ThemeManager::setMode(const ThemeMode mode)
@@ -53,7 +53,11 @@ QString ThemeManager::styleSheet() const
     const QString muted = dark ? QStringLiteral("#9DA3AE") : QStringLiteral("#6E747E");
 
     return QStringLiteral(R"(
-        * { font-family: "Segoe UI"; font-size: 10pt; color: %1; }
+        * {
+            font-family: "Times New Roman", "Microsoft YaHei";
+            font-size: 10pt;
+            color: %1;
+        }
         QMainWindow, QWidget#windowRoot, QWidget#pageArea { background: %2; }
         QWidget#titleBar, QWidget#sideNavigation, QWidget#statusBar { background: %3; }
         QFrame[card="true"] { background: %4; border: 1px solid %5; border-radius: 8px; }
@@ -69,7 +73,6 @@ QString ThemeManager::styleSheet() const
         QPushButton[nav="true"] { text-align: left; padding: 9px 10px; border-radius: 5px; }
         QPushButton[nav="true"]:checked {
             background: %7; color: #28A9E0;
-            border-left: 3px solid #28A9E0;
         }
         QComboBox, QSpinBox {
             background: %4; border: 1px solid %5; border-radius: 5px;
@@ -105,5 +108,7 @@ QString ThemeManager::styleSheet() const
             width: 14px; margin: -5px 0; background: #28A9E0; border-radius: 7px;
         }
         QFrame[channelRow="true"]:hover { background: %7; border-radius: 4px; }
+        QToolButton#closeButton:hover { background: #E5484D; }
+        QLabel#titlePageName { color: %6; }
     )").arg(text, bg, panel, card, border, muted, hover);
 }

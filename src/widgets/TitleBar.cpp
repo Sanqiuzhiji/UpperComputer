@@ -1,71 +1,96 @@
 #include "TitleBar.h"
 
+#include "theme/IconManager.h"
+
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QToolButton>
 
-TitleBar::TitleBar(QWidget *parent)
-    : QWidget(parent)
+TitleBar::TitleBar(IconManager *iconManager, QWidget *parent)
+    : QWidget(parent),
+      m_iconManager(iconManager)
 {
     setObjectName(QStringLiteral("titleBar"));
-    setFixedHeight(44);
-
+    setFixedHeight(42);
     auto *layout = new QHBoxLayout(this);
-    layout->setContentsMargins(8, 4, 6, 4);
-    layout->setSpacing(3);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
 
-    auto *back = createButton(QStringLiteral("‹"), tr("Back"));
-    auto *forward = createButton(QStringLiteral("›"), tr("Forward"));
-    auto *menu = createButton(QStringLiteral("☰"), tr("Collapse navigation"));
-    connect(back, &QToolButton::clicked, this, &TitleBar::backRequested);
-    connect(forward, &QToolButton::clicked, this, &TitleBar::forwardRequested);
-    connect(menu, &QToolButton::clicked, this, &TitleBar::navigationToggleRequested);
+    m_menuButton = createButton(QStringLiteral(":/icons/titlebar/menu.svg"),
+                                tr("展开或折叠导航栏"), QSize(42, 42));
+    connect(m_menuButton, &QToolButton::clicked,
+            this, &TitleBar::navigationToggleRequested);
 
-    auto *icon = new QLabel(QStringLiteral("UC"), this);
-    icon->setAlignment(Qt::AlignCenter);
-    icon->setFixedSize(28, 28);
-    icon->setStyleSheet(QStringLiteral(
-        "background:#28A9E0;color:white;border-radius:7px;font-weight:700;"));
+    m_appIcon = new QLabel(this);
+    m_appIcon->setAlignment(Qt::AlignCenter);
+    m_appIcon->setFixedSize(34, 42);
     auto *name = new QLabel(QStringLiteral("UpperComputer"), this);
     QFont nameFont = name->font();
     nameFont.setBold(true);
     name->setFont(nameFont);
+    m_pageTitle = new QLabel(tr("Plot"), this);
+    m_pageTitle->setObjectName(QStringLiteral("titlePageName"));
 
-    auto *pin = createButton(QStringLiteral("⌖"), tr("Always on top"));
-    pin->setCheckable(true);
-    connect(pin, &QToolButton::toggled, this, &TitleBar::pinToggleRequested);
-    auto *theme = createButton(QStringLiteral("◐"), tr("Toggle light/dark theme"));
-    connect(theme, &QToolButton::clicked, this, &TitleBar::themeToggleRequested);
-    auto *minimize = createButton(QStringLiteral("—"), tr("Minimize"));
-    connect(minimize, &QToolButton::clicked, this, &TitleBar::minimizeRequested);
-    m_maximizeButton = createButton(QStringLiteral("□"), tr("Maximize"));
+    m_pinButton = createButton(QStringLiteral(":/icons/titlebar/pin.svg"),
+                               tr("窗口置顶"), QSize(46, 42));
+    m_pinButton->setCheckable(true);
+    connect(m_pinButton, &QToolButton::toggled, this, [this](const bool pinned) {
+        m_pinned = pinned;
+        refreshIcons();
+        emit pinToggleRequested(pinned);
+    });
+    m_themeButton = createButton(QStringLiteral(":/icons/titlebar/theme.svg"),
+                                 tr("切换深浅主题"), QSize(46, 42));
+    connect(m_themeButton, &QToolButton::clicked,
+            this, &TitleBar::themeToggleRequested);
+    m_minimizeButton = createButton(QStringLiteral(":/icons/titlebar/minimize.svg"),
+                                    tr("最小化"), QSize(46, 42));
+    connect(m_minimizeButton, &QToolButton::clicked,
+            this, &TitleBar::minimizeRequested);
+    m_maximizeButton = createButton(QStringLiteral(":/icons/titlebar/maximize.svg"),
+                                    tr("最大化"), QSize(46, 42));
     connect(m_maximizeButton, &QToolButton::clicked,
             this, &TitleBar::maximizeRestoreRequested);
-    auto *close = createButton(QStringLiteral("×"), tr("Close"));
-    close->setObjectName(QStringLiteral("closeButton"));
-    close->setStyleSheet(QStringLiteral(
-        "QToolButton#closeButton:hover{background:#E5484D;color:white;}"));
-    connect(close, &QToolButton::clicked, this, &TitleBar::closeRequested);
+    m_closeButton = createButton(QStringLiteral(":/icons/titlebar/close.svg"),
+                                 tr("关闭"), QSize(46, 42), Qt::white);
+    m_closeButton->setObjectName(QStringLiteral("closeButton"));
+    connect(m_closeButton, &QToolButton::clicked, this, &TitleBar::closeRequested);
 
-    layout->addWidget(back);
-    layout->addWidget(forward);
-    layout->addWidget(menu);
+    layout->addWidget(m_menuButton);
     layout->addSpacing(8);
-    layout->addWidget(icon);
+    layout->addWidget(m_appIcon);
+    layout->addSpacing(5);
     layout->addWidget(name);
+    layout->addSpacing(12);
+    layout->addWidget(m_pageTitle);
     layout->addStretch();
-    layout->addWidget(pin);
-    layout->addWidget(theme);
-    layout->addWidget(minimize);
+    layout->addWidget(m_pinButton);
+    layout->addWidget(m_themeButton);
+    layout->addWidget(m_minimizeButton);
     layout->addWidget(m_maximizeButton);
-    layout->addWidget(close);
+    layout->addWidget(m_closeButton);
+
+    connect(m_iconManager, &IconManager::iconsChanged,
+            this, &TitleBar::refreshIcons);
+    refreshIcons();
 }
 
 void TitleBar::setMaximized(const bool maximized)
 {
-    m_maximizeButton->setText(maximized ? QStringLiteral("❐") : QStringLiteral("□"));
-    m_maximizeButton->setToolTip(maximized ? tr("Restore") : tr("Maximize"));
+    m_maximized = maximized;
+    m_maximizeButton->setToolTip(maximized ? tr("还原") : tr("最大化"));
+    refreshIcons();
+}
+
+void TitleBar::setCurrentPageTitle(const QString &title)
+{
+    m_pageTitle->setText(title);
+}
+
+QPoint TitleBar::themeButtonCenter(QWidget *target) const
+{
+    return m_themeButton->mapTo(target, m_themeButton->rect().center());
 }
 
 void TitleBar::mouseDoubleClickEvent(QMouseEvent *event)
@@ -78,15 +103,36 @@ void TitleBar::mouseDoubleClickEvent(QMouseEvent *event)
     QWidget::mouseDoubleClickEvent(event);
 }
 
-QToolButton *TitleBar::createButton(const QString &text, const QString &toolTip)
+void TitleBar::refreshIcons()
+{
+    m_menuButton->setIcon(m_iconManager->icon(QStringLiteral(":/icons/titlebar/menu.svg")));
+    m_pinButton->setIcon(m_pinned
+        ? m_iconManager->rotatedIcon(QStringLiteral(":/icons/titlebar/pin.svg"), 90.0)
+        : m_iconManager->icon(QStringLiteral(":/icons/titlebar/pin.svg")));
+    m_themeButton->setIcon(m_iconManager->icon(
+        m_iconManager->isDarkTheme()
+            ? QStringLiteral(":/icons/titlebar/theme_filled.svg")
+            : QStringLiteral(":/icons/titlebar/theme.svg")));
+    m_minimizeButton->setIcon(m_iconManager->icon(QStringLiteral(":/icons/titlebar/minimize.svg")));
+    m_maximizeButton->setIcon(m_iconManager->icon(
+        m_maximized ? QStringLiteral(":/icons/titlebar/restore.svg")
+                    : QStringLiteral(":/icons/titlebar/maximize.svg")));
+    m_closeButton->setIcon(m_iconManager->icon(
+        QStringLiteral(":/icons/titlebar/close.svg"), Qt::white));
+    m_appIcon->setPixmap(m_iconManager->pixmap(
+        QStringLiteral(":/icons/common/app.svg"), QSize(24, 24), QColor("#28A9E0")));
+}
+
+QToolButton *TitleBar::createButton(const QString &iconPath,
+                                    const QString &toolTip,
+                                    const QSize &size,
+                                    const QColor &activeColor)
 {
     auto *button = new QToolButton(this);
-    button->setText(text);
+    button->setIcon(m_iconManager->icon(iconPath, activeColor));
+    button->setIconSize(QSize(20, 20));
     button->setToolTip(toolTip);
-    button->setFixedSize(34, 32);
+    button->setFixedSize(size);
     button->setAutoRaise(true);
-    QFont font = button->font();
-    font.setPointSize(13);
-    button->setFont(font);
     return button;
 }

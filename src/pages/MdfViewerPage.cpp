@@ -18,14 +18,14 @@ MdfViewerPage::MdfViewerPage(QWidget *parent)
     auto *mdi = new QMdiArea(this);
     auto *content = new QSplitter(Qt::Horizontal, mdi);
     auto *tree = new QTreeWidget(content);
-    tree->setHeaderLabel(tr("Channels"));
-    tree->addTopLevelItem(new QTreeWidgetItem({tr("Demo group")}));
+    tree->setHeaderLabel(tr("通道"));
+    tree->addTopLevelItem(new QTreeWidgetItem({tr("演示分组")}));
     content->addWidget(tree);
-    auto *plot = new QLabel(tr("MDF curve preview"), content);
+    auto *plot = new QLabel(tr("MDF 曲线预览"), content);
     plot->setAlignment(Qt::AlignCenter);
     content->addWidget(plot);
     auto *subWindow = mdi->addSubWindow(content);
-    subWindow->setWindowTitle(tr("MDF Viewer · Demo"));
+    subWindow->setWindowTitle(tr("MDF Viewer · 演示"));
     subWindow->resize(760, 480);
     subWindow->show();
     layout->addWidget(title);

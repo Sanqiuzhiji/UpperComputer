@@ -15,6 +15,7 @@ public:
     explicit SettingsPage(ThemeManager *themeManager, QWidget *parent = nullptr);
 
 signals:
+    void themeModeRequested(ThemeMode mode);
     void userCardVisibilityChanged(bool visible);
     void navigationModeChanged(const QString &mode);
     void unavailableSettingRequested(const QString &setting);

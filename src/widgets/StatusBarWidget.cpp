@@ -11,15 +11,15 @@ StatusBarWidget::StatusBarWidget(QWidget *parent)
     auto *layout = new QHBoxLayout(this);
     layout->setContentsMargins(12, 0, 12, 0);
 
-    auto *connection = new QLabel(tr("●  Disconnected"), this);
+    auto *connection = new QLabel(tr("未连接"), this);
     connection->setStyleSheet(QStringLiteral("color:#9DA3AE;"));
-    auto *source = new QLabel(tr("Source: Virtual Data"), this);
+    auto *source = new QLabel(tr("数据源：虚拟数据"), this);
     source->setProperty("muted", true);
-    auto *rates = new QLabel(tr("RX 0 B/s    TX 0 B/s"), this);
+    auto *rates = new QLabel(tr("接收 0 B/s    发送 0 B/s"), this);
     rates->setProperty("muted", true);
-    m_theme = new QLabel(tr("Theme: Dark"), this);
+    m_theme = new QLabel(tr("主题：深色"), this);
     m_theme->setProperty("muted", true);
-    m_page = new QLabel(tr("Page: Plot"), this);
+    m_page = new QLabel(tr("页面：Plot"), this);
     m_page->setProperty("muted", true);
 
     layout->addWidget(connection);
@@ -34,10 +34,10 @@ StatusBarWidget::StatusBarWidget(QWidget *parent)
 
 void StatusBarWidget::setCurrentPage(const QString &page)
 {
-    m_page->setText(tr("Page: %1").arg(page));
+    m_page->setText(tr("页面：%1").arg(page));
 }
 
 void StatusBarWidget::setTheme(const QString &theme)
 {
-    m_theme->setText(tr("Theme: %1").arg(theme));
+    m_theme->setText(tr("主题：%1").arg(theme));
 }

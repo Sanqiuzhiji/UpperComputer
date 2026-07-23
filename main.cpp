@@ -11,7 +11,9 @@ int main(int argc, char *argv[])
     QApplication::setOrganizationName(QStringLiteral("UpperComputer"));
     QApplication::setApplicationVersion(QStringLiteral("0.1.0"));
 
-    QFont font(QStringLiteral("Segoe UI"));
+    // Times New Roman supplies Latin letters and digits. Chinese glyphs
+    // automatically fall back to Microsoft YaHei through the application QSS.
+    QFont font(QStringLiteral("Times New Roman"));
     font.setPointSize(10);
     application.setFont(font);
 

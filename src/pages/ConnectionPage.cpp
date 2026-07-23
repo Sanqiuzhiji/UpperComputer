@@ -19,10 +19,10 @@ ConnectionPage::ConnectionPage(QWidget *parent)
     auto *cardLayout = new QVBoxLayout(card);
     cardLayout->setContentsMargins(20, 18, 20, 18);
     auto *source = new QComboBox(card);
-    source->addItems({tr("Virtual Data"), tr("Serial Port"), tr("UDP"), tr("TCP")});
-    auto *connectButton = new QPushButton(tr("Connect virtual source"), card);
+    source->addItems({tr("虚拟数据"), tr("串口"), tr("UDP"), tr("TCP")});
+    auto *connectButton = new QPushButton(tr("连接虚拟数据源"), card);
     connectButton->setProperty("accent", true);
-    cardLayout->addWidget(new QLabel(tr("Data source"), card));
+    cardLayout->addWidget(new QLabel(tr("数据源"), card));
     cardLayout->addWidget(source);
     cardLayout->addWidget(connectButton, 0, Qt::AlignLeft);
     cardLayout->addStretch();

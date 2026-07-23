@@ -1,0 +1,20 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file alias="titlebar/menu.svg">icons/titlebar/menu.svg</file>
+        <file alias="titlebar/pin.svg">icons/titlebar/pin.svg</file>
+        <file alias="titlebar/theme.svg">icons/titlebar/theme.svg</file>
+        <file alias="titlebar/theme_filled.svg">icons/titlebar/theme_filled.svg</file>
+        <file alias="titlebar/minimize.svg">icons/titlebar/minimize.svg</file>
+        <file alias="titlebar/maximize.svg">icons/titlebar/maximize.svg</file>
+        <file alias="titlebar/restore.svg">icons/titlebar/restore.svg</file>
+        <file alias="titlebar/close.svg">icons/titlebar/close.svg</file>
+        <file alias="navigation/plot.svg">icons/navigation/plot.svg</file>
+        <file alias="navigation/connection.svg">icons/navigation/connection.svg</file>
+        <file alias="navigation/protocol.svg">icons/navigation/protocol.svg</file>
+        <file alias="navigation/can_bus.svg">icons/navigation/can_bus.svg</file>
+        <file alias="navigation/mdf_viewer.svg">icons/navigation/mdf_viewer.svg</file>
+        <file alias="navigation/about.svg">icons/navigation/about.svg</file>
+        <file alias="navigation/settings.svg">icons/navigation/settings.svg</file>
+        <file alias="common/app.svg">icons/common/app.svg</file>
+    </qresource>
+</RCC>

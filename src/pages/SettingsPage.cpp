@@ -14,12 +14,8 @@ SettingsPage::SettingsPage(ThemeManager *themeManager, QWidget *parent)
     auto *rootLayout = new QVBoxLayout(this);
     rootLayout->setContentsMargins(28, 24, 28, 28);
     rootLayout->setSpacing(14);
-
-    auto *title = new QLabel(tr("Settings"), this);
-    QFont titleFont = title->font();
-    titleFont.setPointSize(20);
-    titleFont.setBold(true);
-    title->setFont(titleFont);
+    auto *title = new QLabel(tr("设置"), this);
+    title->setObjectName(QStringLiteral("pageTitle"));
     rootLayout->addWidget(title);
 
     auto *scrollArea = new QScrollArea(this);
@@ -29,12 +25,12 @@ SettingsPage::SettingsPage(ThemeManager *themeManager, QWidget *parent)
     contentLayout->setContentsMargins(0, 0, 8, 0);
     contentLayout->setSpacing(10);
 
-    m_themeCombo = createOptions({tr("Dark"), tr("Light")});
+    m_themeCombo = createOptions({tr("深色"), tr("浅色")});
     m_themeCombo->setCurrentIndex(m_themeManager->mode() == ThemeMode::Dark ? 0 : 1);
     contentLayout->addWidget(createSettingCard(
-        tr("Appearance"), tr("Switch the application color theme immediately."), m_themeCombo));
+        tr("外观主题"), tr("切换应用程序的深色或浅色主题。"), m_themeCombo));
     connect(m_themeCombo, &QComboBox::currentIndexChanged, this, [this](const int index) {
-        m_themeManager->setMode(index == 0 ? ThemeMode::Dark : ThemeMode::Light);
+        emit themeModeRequested(index == 0 ? ThemeMode::Dark : ThemeMode::Light);
     });
     connect(m_themeManager, &ThemeManager::themeChanged, this, [this](const ThemeMode mode) {
         m_themeCombo->blockSignals(true);
@@ -42,49 +38,44 @@ SettingsPage::SettingsPage(ThemeManager *themeManager, QWidget *parent)
         m_themeCombo->blockSignals(false);
     });
 
-    auto *msaa = createOptions({tr("Off"), tr("2x"), tr("4x"), tr("8x")});
+    auto *msaa = createOptions({tr("关闭"), tr("2 倍"), tr("4 倍"), tr("8 倍")});
     contentLayout->addWidget(createSettingCard(
-        tr("MSAA"), tr("Anti-aliasing level for future plots and 3D views."), msaa));
-
-    auto *fps = createOptions({tr("30 FPS"), tr("60 FPS"), tr("120 FPS")});
+        tr("多重采样抗锯齿"), tr("用于后续曲线和三维视图的抗锯齿等级。"), msaa));
+    auto *fps = createOptions({tr("30 帧/秒"), tr("60 帧/秒"), tr("120 帧/秒")});
     fps->setCurrentIndex(1);
     contentLayout->addWidget(createSettingCard(
-        tr("Plot refresh rate"), tr("Target refresh rate for simulated and live charts."), fps));
-
-    auto *userCard = new QCheckBox(tr("Show"), this);
+        tr("绘图刷新率"), tr("模拟曲线和实时曲线的目标刷新率。"), fps));
+    auto *userCard = new QCheckBox(tr("显示"), this);
     userCard->setChecked(true);
     contentLayout->addWidget(createSettingCard(
-        tr("User card"), tr("Show software information at the top of the navigation."), userCard));
+        tr("用户信息卡片"), tr("在导航栏顶部显示软件信息。"), userCard));
     connect(userCard, &QCheckBox::toggled, this, &SettingsPage::userCardVisibilityChanged);
 
-    auto *renderMode = createOptions({tr("Native"), tr("Raster"), tr("OpenGL")});
+    auto *renderMode = createOptions({tr("原生"), tr("光栅"), tr("OpenGL")});
     contentLayout->addWidget(createSettingCard(
-        tr("Window rendering"), tr("Rendering backend selection placeholder."), renderMode));
-
-    auto *visualEffect = createOptions({tr("Standard"), tr("Mica"), tr("Acrylic")});
+        tr("窗口绘制模式"), tr("窗口绘制后端选项，当前仅保留界面。"), renderMode));
+    auto *visualEffect = createOptions({tr("标准"), tr("云母"), tr("亚克力")});
     contentLayout->addWidget(createSettingCard(
-        tr("Window visual effect"), tr("Windows 11 backdrop integration placeholder."), visualEffect));
-
-    auto *navigation = createOptions({tr("Expanded"), tr("Compact"), tr("Auto")});
+        tr("窗口视觉效果"), tr("Windows 11 窗口背景效果，当前仅保留界面。"), visualEffect));
+    auto *navigation = createOptions({tr("展开"), tr("紧凑"), tr("自动")});
     contentLayout->addWidget(createSettingCard(
-        tr("Navigation mode"), tr("Choose expanded, compact, or width-aware navigation."), navigation));
+        tr("导航栏模式"), tr("选择展开、紧凑或根据窗口宽度自动调整。"), navigation));
     connect(navigation, &QComboBox::currentTextChanged,
             this, &SettingsPage::navigationModeChanged);
-
-    auto *transition = createOptions({tr("None"), tr("Fade"), tr("Slide")});
+    auto *transition = createOptions({tr("无动画"), tr("淡入"), tr("滑动")});
     contentLayout->addWidget(createSettingCard(
-        tr("Page transition"), tr("Animation selection reserved for a future version."), transition));
+        tr("页面切换方式"), tr("页面切换动画将在后续版本实现。"), transition));
 
     const auto unavailable = [this](const QString &name, QComboBox *combo) {
         connect(combo, &QComboBox::activated, this, [this, name](int) {
             emit unavailableSettingRequested(name);
         });
     };
-    unavailable(tr("MSAA"), msaa);
-    unavailable(tr("Plot refresh rate"), fps);
-    unavailable(tr("Window rendering"), renderMode);
-    unavailable(tr("Window visual effect"), visualEffect);
-    unavailable(tr("Page transition"), transition);
+    unavailable(tr("多重采样抗锯齿"), msaa);
+    unavailable(tr("绘图刷新率"), fps);
+    unavailable(tr("窗口绘制模式"), renderMode);
+    unavailable(tr("窗口视觉效果"), visualEffect);
+    unavailable(tr("页面切换方式"), transition);
 
     contentLayout->addStretch();
     scrollArea->setWidget(content);
@@ -100,7 +91,6 @@ QWidget *SettingsPage::createSettingCard(const QString &title,
     card->setMinimumHeight(76);
     auto *layout = new QHBoxLayout(card);
     layout->setContentsMargins(18, 12, 18, 12);
-
     auto *textLayout = new QVBoxLayout;
     textLayout->setSpacing(3);
     auto *titleLabel = new QLabel(title, card);
@@ -112,7 +102,6 @@ QWidget *SettingsPage::createSettingCard(const QString &title,
     descriptionLabel->setWordWrap(true);
     textLayout->addWidget(titleLabel);
     textLayout->addWidget(descriptionLabel);
-
     control->setParent(card);
     control->setMinimumWidth(150);
     layout->addLayout(textLayout, 1);
