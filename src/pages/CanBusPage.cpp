@@ -1,6 +1,6 @@
 #include "CanBusPage.h"
 
-CanBusPage::CanBusPage(QWidget *parent)
+CanBusPage::CanBusPage(AppContext *, QWidget *parent)
     : QWidget(parent)
 {
 }

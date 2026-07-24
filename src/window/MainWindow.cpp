@@ -1,15 +1,12 @@
 #include "MainWindow.h"
 
-#include "pages/AboutPage.h"
-#include "pages/CanBusPage.h"
-#include "pages/ConnectionPage.h"
-#include "pages/MdfViewerPage.h"
-#include "pages/PageId.h"
-#include "pages/PlotPage.h"
-#include "pages/ProtocolEditorPage.h"
+#include "app/AppContext.h"
+#include "app/AppSettings.h"
+#include "pages/PageRegistry.h"
 #include "pages/SettingsPage.h"
-#include "theme/ThemeManager.h"
+#include "services/ConnectionManager.h"
 #include "theme/IconManager.h"
+#include "theme/ThemeManager.h"
 #include "widgets/SideNavigation.h"
 #include "widgets/StatusBarWidget.h"
 #include "widgets/TitleBar.h"
@@ -25,7 +22,6 @@
 #include <QPropertyAnimation>
 #include <QResizeEvent>
 #include <QStackedWidget>
-#include <QSettings>
 #include <QVBoxLayout>
 #include <QWindow>
 #include <QPainter>
@@ -40,6 +36,7 @@ constexpr int kToastDurationMs = 2000;
 constexpr int kToastSpacing = 10;
 constexpr int kToastRightMargin = 18;
 constexpr int kToastBottomMargin = 16;
+constexpr int kMaximumToastCount = 3;
 }
 
 #ifdef Q_OS_WIN
@@ -47,9 +44,11 @@ constexpr int kToastBottomMargin = 16;
 #include <windowsx.h>
 #endif
 
-MainWindow::MainWindow(ThemeManager *themeManager, QWidget *parent)
+MainWindow::MainWindow(AppContext *context, QWidget *parent)
     : QMainWindow(parent),
-      m_themeManager(themeManager)
+      m_context(context),
+      m_settings(context->settings()),
+      m_themeManager(context->themeManager())
 {
     m_iconManager = new IconManager(m_themeManager, this);
     setWindowTitle(QStringLiteral("UpperComputer"));
@@ -58,7 +57,6 @@ MainWindow::MainWindow(ThemeManager *themeManager, QWidget *parent)
     setMinimumSize(960, 640);
     resize(1440, 900);
     createUi();
-    createPages();
 
     connect(m_titleBar, &TitleBar::navigationToggleRequested,
             m_navigation, &SideNavigation::toggleExpanded);
@@ -72,12 +70,16 @@ MainWindow::MainWindow(ThemeManager *themeManager, QWidget *parent)
     connect(m_navigation, &SideNavigation::pageRequested,
             this, &MainWindow::switchPage);
     connect(m_themeManager, &ThemeManager::themeChanged, this, [this](ThemeMode) {
-        m_statusBar->setTheme(m_themeManager->modeName());
+        m_statusBar->setThemeMode(m_themeManager->mode());
     });
 
     m_titleBar->installEventFilter(this);
-    m_statusBar->setTheme(m_themeManager->modeName());
+    m_statusBar->setThemeMode(m_themeManager->mode());
+    bindConnectionStatus();
+    m_navigation->setUserCardVisible(m_settings->userCardVisible());
+    applyNavigationMode(m_settings->navigationMode());
     restoreWindowSettings();
+    switchPage(m_settings->lastPage());
 }
 
 bool MainWindow::event(QEvent *event)
@@ -112,7 +114,7 @@ void MainWindow::resizeEvent(QResizeEvent *event)
     QMainWindow::resizeEvent(event);
     layoutToasts(false);
     // Auto mode is deliberately width-aware, while preserving the selected page.
-    if (m_navigation->property("autoMode").toBool()) {
+    if (m_navigation->mode() == NavigationMode::Automatic) {
         m_navigation->setExpanded(width() >= 1150);
     }
 }
@@ -120,9 +122,8 @@ void MainWindow::resizeEvent(QResizeEvent *event)
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     cancelThemeTransition();
-    QSettings settings;
-    settings.setValue(QStringLiteral("window/geometry"), saveGeometry());
-    settings.setValue(QStringLiteral("window/state"), saveState());
+    m_settings->setWindowGeometry(saveGeometry());
+    m_settings->setWindowMaximized(isMaximized());
     QMainWindow::closeEvent(event);
 }
 
@@ -167,16 +168,18 @@ bool MainWindow::nativeEvent(const QByteArray &eventType, void *message, qintptr
 }
 #endif
 
-void MainWindow::switchPage(const PageId page, const QString &title)
+void MainWindow::switchPage(const PageId page)
 {
-    const auto iterator = m_pageIndexes.constFind(page);
-    if (iterator == m_pageIndexes.cend()) {
+    const PageDescriptor *descriptor = findPageDescriptor(page);
+    QWidget *pageWidget = ensurePage(page);
+    if (!descriptor || !pageWidget) {
         return;
     }
-    m_pages->setCurrentIndex(iterator.value());
+    m_pages->setCurrentWidget(pageWidget);
     m_navigation->setCurrentPage(page);
-    m_statusBar->setCurrentPage(title);
-    m_titleBar->setCurrentPageTitle(title);
+    m_statusBar->setCurrentPageTitle(descriptor->title);
+    m_titleBar->setCurrentPageTitle(descriptor->title);
+    m_settings->setLastPage(page);
 }
 
 void MainWindow::toggleMaximized()
@@ -200,28 +203,29 @@ void MainWindow::setPinned(const bool pinned)
                       : ToastWidget::Type::Information);
 }
 
-void MainWindow::applyNavigationMode(const QString &mode)
+void MainWindow::applyNavigationMode(const NavigationMode mode)
 {
-    const bool automatic = mode == tr("自动");
-    m_navigation->setProperty("autoMode", automatic);
-    if (automatic) {
-        m_navigation->setMode(SideNavigation::Mode::Auto);
+    m_settings->setNavigationMode(mode);
+    m_navigation->setMode(mode);
+    if (mode == NavigationMode::Automatic) {
         m_navigation->setExpanded(width() >= 1150);
-    } else if (mode == tr("紧凑")) {
-        m_navigation->setMode(SideNavigation::Mode::Compact);
-    } else {
-        m_navigation->setMode(SideNavigation::Mode::Expanded);
     }
 }
 
 void MainWindow::showNotice(const QString &message, const ToastWidget::Type type)
 {
+    if (m_toasts.size() >= kMaximumToastCount) {
+        ToastWidget *oldest = m_toasts.takeFirst();
+        oldest->hide();
+        oldest->deleteLater();
+    }
     auto *toast = new ToastWidget(
         m_iconManager, tr("状态提示"), message, type, m_root);
     connect(toast, &ToastWidget::closeRequested,
             this, &MainWindow::dismissToast);
     m_toasts.append(toast);
-    toast->move(width() - toast->width() - kToastRightMargin, height());
+    toast->move(m_root->width() - toast->width() - kToastRightMargin,
+                m_root->height());
     toast->show();
     toast->raise();
     layoutToasts(true);
@@ -237,8 +241,12 @@ void MainWindow::toggleThemeWithTransition()
 
 void MainWindow::startThemeTransition(const ThemeMode targetMode)
 {
-    if (m_themeTransitionActive || targetMode == m_themeManager->mode()
-        || isMinimized() || !isVisible()) {
+    if (m_themeTransitionActive) {
+        // A rapid second request replaces the current transition instead of
+        // stacking another full-window overlay.
+        cancelThemeTransition();
+    }
+    if (targetMode == m_themeManager->mode() || isMinimized() || !isVisible()) {
         return;
     }
 
@@ -261,6 +269,9 @@ void MainWindow::startThemeTransition(const ThemeMode targetMode)
     }
 
     // Render the new themed frame immediately; there is no scheduled delay.
+    // This full-window snapshot transition is appropriate for the current
+    // QWidget-only shell. Real-time plots or native OpenGL surfaces should
+    // later use a background-layer transition instead of captured frames.
     m_themeOverlay->hide();
     QPixmap newFrame(m_root->size() * m_root->devicePixelRatioF());
     newFrame.setDevicePixelRatio(m_root->devicePixelRatioF());
@@ -333,34 +344,84 @@ void MainWindow::createUi()
 
 }
 
-void MainWindow::createPages()
+QWidget *MainWindow::ensurePage(const PageId id)
 {
-    addPage(PageId::Plot, new PlotPage(m_pages));
-    addPage(PageId::Connection, new ConnectionPage(m_pages));
-    addPage(PageId::ProtocolEditor, new ProtocolEditorPage(m_pages));
-    addPage(PageId::CanBus, new CanBusPage(m_pages));
-    addPage(PageId::MdfViewer, new MdfViewerPage(m_pages));
-    addPage(PageId::About, new AboutPage(m_pages));
+    if (const auto iterator = m_createdPages.constFind(id);
+        iterator != m_createdPages.cend()) {
+        return iterator.value();
+    }
 
-    auto *settings = new SettingsPage(m_themeManager, m_pages);
-    connect(settings, &SettingsPage::userCardVisibilityChanged,
-            m_navigation, &SideNavigation::setUserCardVisible);
-    connect(settings, &SettingsPage::navigationModeChanged,
+    const PageDescriptor *descriptor = findPageDescriptor(id);
+    if (!descriptor || !descriptor->factory) {
+        showNotice(tr("找不到页面注册信息"), ToastWidget::Type::Error);
+        return nullptr;
+    }
+
+    QWidget *page = nullptr;
+    try {
+        page = descriptor->factory(m_context, m_pages);
+    } catch (...) {
+        showNotice(tr("页面“%1”创建失败").arg(descriptor->title),
+                   ToastWidget::Type::Error);
+        return nullptr;
+    }
+    if (!page) {
+        showNotice(tr("页面“%1”创建失败").arg(descriptor->title),
+                   ToastWidget::Type::Error);
+        return nullptr;
+    }
+
+    m_pages->addWidget(page);
+    m_createdPages.insert(id, page);
+    configurePage(id, page);
+    return page;
+}
+
+void MainWindow::configurePage(const PageId id, QWidget *page)
+{
+    if (id != PageId::Settings) {
+        return;
+    }
+
+    auto *settingsPage = qobject_cast<SettingsPage *>(page);
+    if (!settingsPage) {
+        return;
+    }
+    connect(settingsPage, &SettingsPage::userCardVisibilityChanged,
+            this, [this](const bool visible) {
+                m_settings->setUserCardVisible(visible);
+                m_navigation->setUserCardVisible(visible);
+            });
+    connect(settingsPage, &SettingsPage::navigationModeChanged,
             this, &MainWindow::applyNavigationMode);
-    connect(settings, &SettingsPage::themeModeRequested,
+    connect(settingsPage, &SettingsPage::themeModeRequested,
             this, &MainWindow::startThemeTransition);
-    connect(settings, &SettingsPage::unavailableSettingRequested, this,
+    connect(settingsPage, &SettingsPage::unavailableSettingRequested, this,
             [this](const QString &name) {
                 showNotice(tr("%1将在后续版本实现").arg(name),
                            ToastWidget::Type::Warning);
             });
-    addPage(PageId::Settings, settings);
-    switchPage(PageId::Plot, tr("Plot"));
 }
 
-void MainWindow::addPage(const PageId id, QWidget *page)
+void MainWindow::bindConnectionStatus()
 {
-    m_pageIndexes.insert(id, m_pages->addWidget(page));
+    ConnectionManager *connection = m_context->connectionManager();
+    connect(connection, &ConnectionManager::stateChanged,
+            m_statusBar, &StatusBarWidget::setConnectionState);
+    connect(connection, &ConnectionManager::deviceNameChanged,
+            m_statusBar, &StatusBarWidget::setDeviceName);
+    connect(connection, &ConnectionManager::dataSourceNameChanged,
+            m_statusBar, &StatusBarWidget::setDataSourceName);
+    connect(connection, &ConnectionManager::receiveRateChanged,
+            m_statusBar, &StatusBarWidget::setReceiveRate);
+    connect(connection, &ConnectionManager::transmitRateChanged,
+            m_statusBar, &StatusBarWidget::setTransmitRate);
+
+    m_statusBar->setConnectionState(connection->state());
+    m_statusBar->setDeviceName(connection->deviceName());
+    m_statusBar->setDataSourceName(connection->dataSourceName());
+    m_statusBar->setReceiveRate(connection->receiveRate());
+    m_statusBar->setTransmitRate(connection->transmitRate());
 }
 
 void MainWindow::updateWindowStateUi()
@@ -370,20 +431,21 @@ void MainWindow::updateWindowStateUi()
 
 void MainWindow::restoreWindowSettings()
 {
-    QSettings settings;
-    const QByteArray geometry =
-        settings.value(QStringLiteral("window/geometry")).toByteArray();
+    const QByteArray geometry = m_settings->windowGeometry();
     if (geometry.isEmpty()) {
-        setWindowState(windowState() | Qt::WindowMaximized);
-        return;
+        resize(1440, 900);
+    } else {
+        restoreGeometry(geometry);
     }
-    restoreGeometry(geometry);
-    restoreState(settings.value(QStringLiteral("window/state")).toByteArray());
+    if (m_settings->windowMaximized()) {
+        setWindowState(windowState() | Qt::WindowMaximized);
+    }
 }
 
 void MainWindow::cancelThemeTransition()
 {
     if (m_themeOverlay) {
+        m_themeOverlay->hide();
         m_themeOverlay->deleteLater();
         m_themeOverlay = nullptr;
     }
@@ -395,14 +457,28 @@ void MainWindow::layoutToasts(const bool animated)
     if (m_toasts.isEmpty() || !m_statusBar) {
         return;
     }
-    const int toastHeight = m_toasts.constFirst()->height();
-    const int totalHeight = m_toasts.size() * toastHeight
-        + (m_toasts.size() - 1) * kToastSpacing;
-    int y = height() - m_statusBar->height()
-        - kToastBottomMargin - totalHeight;
-    const int x = width() - m_toasts.constFirst()->width() - kToastRightMargin;
+    const int availableBottom = m_root->height() - m_statusBar->height()
+        - kToastBottomMargin;
+    const int minimumTop = m_titleBar->height() + 8;
+    const int availableHeight = qMax(0, availableBottom - minimumTop);
+    const auto totalToastHeight = [this] {
+        int total = (m_toasts.size() - 1) * kToastSpacing;
+        for (const ToastWidget *toast : std::as_const(m_toasts)) {
+            total += toast->height();
+        }
+        return total;
+    };
+    while (m_toasts.size() > 1 && totalToastHeight() > availableHeight) {
+        ToastWidget *oldest = m_toasts.takeFirst();
+        oldest->hide();
+        oldest->deleteLater();
+    }
+    const int totalHeight = totalToastHeight();
+    int y = qMax(minimumTop, availableBottom - totalHeight);
 
     for (ToastWidget *toast : std::as_const(m_toasts)) {
+        const int x = qMax(
+            8, m_root->width() - toast->width() - kToastRightMargin);
         const QRect target(x, y, toast->width(), toast->height());
         if (animated) {
             auto *movement = new QPropertyAnimation(toast, "geometry", toast);
@@ -415,7 +491,7 @@ void MainWindow::layoutToasts(const bool animated)
             toast->setGeometry(target);
         }
         toast->raise();
-        y += toastHeight + kToastSpacing;
+        y += toast->height() + kToastSpacing;
     }
 }
 

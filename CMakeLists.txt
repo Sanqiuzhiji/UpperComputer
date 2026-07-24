@@ -9,24 +9,26 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
-# Prefer passing Qt6_DIR or CMAKE_PREFIX_PATH from the CLion toolchain/profile.
-# Keep the local fallback so the existing workstation remains zero-config.
-if(NOT DEFINED CMAKE_PREFIX_PATH AND
-   EXISTS "D:/Professional_Use_Software/Qt/6.11.1/msvc2022_64")
-    list(APPEND CMAKE_PREFIX_PATH
-         "D:/Professional_Use_Software/Qt/6.11.1/msvc2022_64")
-endif()
-
+# Configure Qt6_DIR or CMAKE_PREFIX_PATH in the CLion CMake profile/toolchain.
 find_package(Qt6 6.11 REQUIRED COMPONENTS Core Gui Widgets Svg)
 
 qt_add_executable(UpperComputer WIN32
     main.cpp
     resources/resources.qrc
+    src/models/AppTypes.h
+    src/app/AppSettings.h
+    src/app/AppSettings.cpp
+    src/app/AppContext.h
+    src/app/AppContext.cpp
+    src/services/ConnectionManager.h
+    src/services/ConnectionManager.cpp
     src/theme/ThemeManager.h
     src/theme/ThemeManager.cpp
     src/theme/IconManager.h
     src/theme/IconManager.cpp
     src/pages/PageId.h
+    src/pages/PageRegistry.h
+    src/pages/PageRegistry.cpp
     src/pages/PlotPage.h
     src/pages/PlotPage.cpp
     src/pages/ConnectionPage.h

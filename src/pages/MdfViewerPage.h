@@ -2,10 +2,12 @@
 
 #include <QWidget>
 
+class AppContext;
+
 class MdfViewerPage final : public QWidget
 {
     Q_OBJECT
 
 public:
-    explicit MdfViewerPage(QWidget *parent = nullptr);
+    explicit MdfViewerPage(AppContext *context, QWidget *parent = nullptr);
 };

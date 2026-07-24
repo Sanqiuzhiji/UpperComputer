@@ -1,5 +1,6 @@
 #include "SideNavigation.h"
 
+#include "pages/PageRegistry.h"
 #include "theme/IconManager.h"
 
 #include <QButtonGroup>
@@ -39,14 +40,14 @@ SideNavigation::SideNavigation(IconManager *iconManager, QWidget *parent)
     m_layout->addWidget(m_userCard);
     m_layout->addSpacing(8);
 
-    addItem(QStringLiteral(":/icons/navigation/plot.svg"), tr("Plot"), PageId::Plot);
-    addItem(QStringLiteral(":/icons/navigation/connection.svg"), tr("Connection"), PageId::Connection);
-    addItem(QStringLiteral(":/icons/navigation/protocol.svg"), tr("Protocol Editor"), PageId::ProtocolEditor);
-    addItem(QStringLiteral(":/icons/navigation/can_bus.svg"), tr("CAN Bus"), PageId::CanBus);
-    addItem(QStringLiteral(":/icons/navigation/mdf_viewer.svg"), tr("MDF Viewer"), PageId::MdfViewer);
-    m_layout->addStretch();
-    addItem(QStringLiteral(":/icons/navigation/about.svg"), tr("关于"), PageId::About);
-    addItem(QStringLiteral(":/icons/navigation/settings.svg"), tr("设置"), PageId::Settings);
+    bool bottomSectionStarted = false;
+    for (const PageDescriptor &descriptor : pageDescriptors()) {
+        if (descriptor.alignBottom && !bottomSectionStarted) {
+            m_layout->addStretch();
+            bottomSectionStarted = true;
+        }
+        addItem(descriptor.iconPath, descriptor.title, descriptor.id);
+    }
 
     m_group->setExclusive(true);
     setCurrentPage(PageId::Plot);
@@ -57,6 +58,7 @@ SideNavigation::SideNavigation(IconManager *iconManager, QWidget *parent)
 }
 
 bool SideNavigation::isExpanded() const noexcept { return m_expanded; }
+NavigationMode SideNavigation::mode() const noexcept { return m_mode; }
 PageId SideNavigation::currentPage() const noexcept { return m_currentPage; }
 qreal SideNavigation::indicatorTop() const noexcept { return m_indicatorTop; }
 qreal SideNavigation::indicatorBottom() const noexcept { return m_indicatorBottom; }
@@ -83,11 +85,11 @@ void SideNavigation::setExpanded(const bool expanded)
     emit expandedChanged(m_expanded);
 }
 
-void SideNavigation::setMode(const Mode mode)
+void SideNavigation::setMode(const NavigationMode mode)
 {
     m_mode = mode;
-    if (mode == Mode::Expanded) setExpanded(true);
-    else if (mode == Mode::Compact) setExpanded(false);
+    if (mode == NavigationMode::Expanded) setExpanded(true);
+    else if (mode == NavigationMode::Compact) setExpanded(false);
 }
 
 void SideNavigation::setUserCardVisible(const bool visible)
@@ -123,9 +125,9 @@ void SideNavigation::addItem(const QString &iconPath,
     m_iconPaths.append(iconPath);
     m_titles.append(title);
     m_pageIds.append(page);
-    connect(button, &QPushButton::clicked, this, [this, page, title] {
+    connect(button, &QPushButton::clicked, this, [this, page] {
         setCurrentPage(page);
-        emit pageRequested(page, title);
+        emit pageRequested(page);
     });
     m_layout->addWidget(button);
 }

@@ -1,6 +1,6 @@
 #include "ConnectionPage.h"
 
-ConnectionPage::ConnectionPage(QWidget *parent)
+ConnectionPage::ConnectionPage(AppContext *, QWidget *parent)
     : QWidget(parent)
 {
 }

@@ -2,10 +2,12 @@
 
 #include <QWidget>
 
+class AppContext;
+
 class ProtocolEditorPage final : public QWidget
 {
     Q_OBJECT
 
 public:
-    explicit ProtocolEditorPage(QWidget *parent = nullptr);
+    explicit ProtocolEditorPage(AppContext *context, QWidget *parent = nullptr);
 };

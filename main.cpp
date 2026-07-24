@@ -1,7 +1,7 @@
 #include <QApplication>
 #include <QFont>
 
-#include "theme/ThemeManager.h"
+#include "app/AppContext.h"
 #include "window/MainWindow.h"
 
 int main(int argc, char *argv[])
@@ -11,14 +11,12 @@ int main(int argc, char *argv[])
     QApplication::setOrganizationName(QStringLiteral("UpperComputer"));
     QApplication::setApplicationVersion(QStringLiteral("0.1.0"));
 
-    // Times New Roman supplies Latin letters and digits. Chinese glyphs
-    // automatically fall back to Microsoft YaHei through the application QSS.
-    QFont font(QStringLiteral("Times New Roman"));
+    QFont font(QStringLiteral("Microsoft YaHei UI"));
     font.setPointSize(10);
     application.setFont(font);
 
-    ThemeManager themeManager;
-    MainWindow window(&themeManager);
+    AppContext context;
+    MainWindow window(&context);
     window.show();
 
     return QApplication::exec();

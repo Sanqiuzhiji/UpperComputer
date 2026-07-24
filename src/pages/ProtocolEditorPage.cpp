@@ -1,6 +1,6 @@
 #include "ProtocolEditorPage.h"
 
-ProtocolEditorPage::ProtocolEditorPage(QWidget *parent)
+ProtocolEditorPage::ProtocolEditorPage(AppContext *, QWidget *parent)
     : QWidget(parent)
 {
 }

@@ -5,7 +5,7 @@
 #include <QSysInfo>
 #include <QVBoxLayout>
 
-AboutPage::AboutPage(QWidget *parent)
+AboutPage::AboutPage(AppContext *, QWidget *parent)
     : QWidget(parent)
 {
     auto *layout = new QVBoxLayout(this);

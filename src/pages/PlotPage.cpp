@@ -1,6 +1,6 @@
 #include "PlotPage.h"
 
-PlotPage::PlotPage(QWidget *parent)
+PlotPage::PlotPage(AppContext *, QWidget *parent)
     : QWidget(parent)
 {
 }

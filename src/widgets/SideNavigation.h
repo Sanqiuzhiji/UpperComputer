@@ -2,6 +2,7 @@
 
 #include <QWidget>
 
+#include "models/AppTypes.h"
 #include "pages/PageId.h"
 
 class IconManager;
@@ -19,10 +20,9 @@ class SideNavigation final : public QWidget
     Q_PROPERTY(qreal indicatorBottom READ indicatorBottom WRITE setIndicatorBottom)
 
 public:
-    enum class Mode { Expanded, Compact, Auto };
-
     explicit SideNavigation(IconManager *iconManager, QWidget *parent = nullptr);
     [[nodiscard]] bool isExpanded() const noexcept;
+    [[nodiscard]] NavigationMode mode() const noexcept;
     [[nodiscard]] PageId currentPage() const noexcept;
     [[nodiscard]] qreal indicatorTop() const noexcept;
     [[nodiscard]] qreal indicatorBottom() const noexcept;
@@ -32,12 +32,12 @@ public:
 public slots:
     void toggleExpanded();
     void setExpanded(bool expanded);
-    void setMode(Mode mode);
+    void setMode(NavigationMode mode);
     void setUserCardVisible(bool visible);
     void setCurrentPage(PageId page);
 
 signals:
-    void pageRequested(PageId page, const QString &title);
+    void pageRequested(PageId page);
     void expandedChanged(bool expanded);
 
 private:
@@ -62,7 +62,7 @@ protected:
     PageId m_currentPage{PageId::Plot};
     bool m_expanded{true};
     bool m_userCardEnabled{true};
-    Mode m_mode{Mode::Expanded};
+    NavigationMode m_mode{NavigationMode::Expanded};
     qreal m_indicatorTop{};
     qreal m_indicatorBottom{};
     bool m_indicatorInitialized{};

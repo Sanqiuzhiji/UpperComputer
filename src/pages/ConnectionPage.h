@@ -2,10 +2,12 @@
 
 #include <QWidget>
 
+class AppContext;
+
 class ConnectionPage final : public QWidget
 {
     Q_OBJECT
 
 public:
-    explicit ConnectionPage(QWidget *parent = nullptr);
+    explicit ConnectionPage(AppContext *context, QWidget *parent = nullptr);
 };

@@ -4,10 +4,12 @@
 #include <QHash>
 #include <QList>
 
+#include "models/AppTypes.h"
 #include "widgets/ToastWidget.h"
 
 enum class PageId;
-enum class ThemeMode;
+class AppContext;
+class AppSettings;
 class QStackedWidget;
 class QCloseEvent;
 class ThemeManager;
@@ -22,7 +24,7 @@ class MainWindow final : public QMainWindow
     Q_OBJECT
 
 public:
-    explicit MainWindow(ThemeManager *themeManager, QWidget *parent = nullptr);
+    explicit MainWindow(AppContext *context, QWidget *parent = nullptr);
 
 protected:
     bool event(QEvent *event) override;
@@ -34,10 +36,10 @@ protected:
 #endif
 
 private slots:
-    void switchPage(PageId page, const QString &title);
+    void switchPage(PageId page);
     void toggleMaximized();
     void setPinned(bool pinned);
-    void applyNavigationMode(const QString &mode);
+    void applyNavigationMode(NavigationMode mode);
     void showNotice(const QString &message,
                     ToastWidget::Type type = ToastWidget::Type::Information);
     void toggleThemeWithTransition();
@@ -45,14 +47,17 @@ private slots:
 
 private:
     void createUi();
-    void createPages();
-    void addPage(PageId id, QWidget *page);
+    [[nodiscard]] QWidget *ensurePage(PageId id);
+    void configurePage(PageId id, QWidget *page);
+    void bindConnectionStatus();
     void updateWindowStateUi();
     void restoreWindowSettings();
     void cancelThemeTransition();
     void layoutToasts(bool animated);
     void dismissToast(ToastWidget *toast);
 
+    AppContext *m_context;
+    AppSettings *m_settings;
     ThemeManager *m_themeManager;
     IconManager *m_iconManager{};
     QWidget *m_root{};
@@ -63,5 +68,5 @@ private:
     ThemeTransitionOverlay *m_themeOverlay{};
     bool m_themeTransitionActive{};
     QList<ToastWidget *> m_toasts;
-    QHash<PageId, int> m_pageIndexes;
+    QHash<PageId, QWidget *> m_createdPages;
 };

@@ -1,10 +1,13 @@
 #include "ThemeManager.h"
 
-#include <QApplication>
-#include <QStyle>
+#include "app/AppSettings.h"
 
-ThemeManager::ThemeManager(QObject *parent)
-    : QObject(parent)
+#include <QApplication>
+
+ThemeManager::ThemeManager(AppSettings *settings, QObject *parent)
+    : QObject(parent),
+      m_settings(settings),
+      m_mode(settings->themeMode())
 {
     apply();
 }
@@ -25,6 +28,7 @@ void ThemeManager::setMode(const ThemeMode mode)
         return;
     }
     m_mode = mode;
+    m_settings->setThemeMode(mode);
     apply();
     emit themeChanged(m_mode);
 }
@@ -36,9 +40,9 @@ void ThemeManager::toggleMode()
 
 void ThemeManager::apply() const
 {
+    // Replacing the application style sheet already triggers the required
+    // repolish. Explicitly unpolishing every widget caused redundant work.
     qApp->setStyleSheet(styleSheet());
-    qApp->style()->unpolish(qApp);
-    qApp->style()->polish(qApp);
 }
 
 QString ThemeManager::styleSheet() const
@@ -54,7 +58,7 @@ QString ThemeManager::styleSheet() const
 
     return QStringLiteral(R"(
         * {
-            font-family: "Times New Roman", "Microsoft YaHei";
+            font-family: "Microsoft YaHei UI", "Segoe UI", "Microsoft YaHei";
             font-size: 10pt;
             color: %1;
         }

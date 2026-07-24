@@ -32,8 +32,11 @@ private:
     [[nodiscard]] QColor accentColor() const;
     [[nodiscard]] QColor backgroundColor() const;
     [[nodiscard]] QColor borderColor() const;
+    [[nodiscard]] QColor titleColor() const;
+    [[nodiscard]] QColor messageColor() const;
 
     Type m_type;
+    bool m_darkTheme{};
     QProgressBar *m_progressBar{};
     QPropertyAnimation *m_countdown{};
     qreal m_progress{1.0};

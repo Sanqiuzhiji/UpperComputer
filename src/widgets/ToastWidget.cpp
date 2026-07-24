@@ -9,25 +9,38 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+namespace {
+constexpr int kMinimumToastWidth = 280;
+constexpr int kMaximumToastWidth = 420;
+constexpr int kMinimumToastHeight = 82;
+}
+
 ToastWidget::ToastWidget(IconManager *iconManager,
                          const QString &title,
                          const QString &message,
                          const Type type,
                          QWidget *parent)
     : QWidget(parent),
-      m_type(type)
+      m_type(type),
+      m_darkTheme(iconManager->isDarkTheme())
 {
     setObjectName(QStringLiteral("toastWidget"));
     setAttribute(Qt::WA_StyledBackground, true);
     setAutoFillBackground(true);
-    setFixedSize(340, 92);
+    setMinimumSize(kMinimumToastWidth, kMinimumToastHeight);
+    setMaximumWidth(kMaximumToastWidth);
+    setMaximumHeight(parent
+        ? qMax(kMinimumToastHeight, parent->height() - 100)
+        : 240);
+    setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Minimum);
     setStyleSheet(QStringLiteral(
         "QWidget#toastWidget{background:%1;border:1px solid %2;border-radius:9px;}"
-        "QLabel#toastTitle{color:#172033;background:transparent;}"
-        "QLabel#toastMessage{color:#52606D;background:transparent;}"
+        "QLabel#toastTitle{color:%3;background:transparent;}"
+        "QLabel#toastMessage{color:%4;background:transparent;}"
         "QToolButton{background:transparent;border:none;border-radius:5px;}"
-        "QToolButton:hover{background:rgba(30,41,59,28);}")
-        .arg(backgroundColor().name(), borderColor().name()));
+        "QToolButton:hover{background:rgba(128,128,128,32);}")
+        .arg(backgroundColor().name(), borderColor().name(),
+             titleColor().name(), messageColor().name()));
 
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(14, 10, 10, 7);
@@ -41,15 +54,13 @@ ToastWidget::ToastWidget(IconManager *iconManager,
         "background:%1;border-radius:4px;").arg(accentColor().name()));
     auto *titleLabel = new QLabel(title, this);
     titleLabel->setObjectName(QStringLiteral("toastTitle"));
-    titleLabel->setStyleSheet(QStringLiteral(
-        "color:#172033;background:transparent;border:none;"));
     QFont titleFont = titleLabel->font();
     titleFont.setBold(true);
     titleLabel->setFont(titleFont);
     auto *closeButton = new QToolButton(this);
     closeButton->setIcon(QIcon(iconManager->pixmap(
         QStringLiteral(":/icons/titlebar/close.svg"),
-        QSize(24, 24), QColor("#334155"))));
+        QSize(24, 24), titleColor())));
     closeButton->setIconSize(QSize(24, 24));
     closeButton->setFixedSize(40, 36);
     closeButton->setToolTip(tr("关闭通知"));
@@ -62,9 +73,9 @@ ToastWidget::ToastWidget(IconManager *iconManager,
 
     auto *messageLabel = new QLabel(message, this);
     messageLabel->setObjectName(QStringLiteral("toastMessage"));
-    messageLabel->setStyleSheet(QStringLiteral(
-        "color:#52606D;background:transparent;border:none;"));
     messageLabel->setWordWrap(true);
+    messageLabel->setMaximumWidth(kMaximumToastWidth - 28);
+    messageLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
     root->addWidget(messageLabel, 1);
 
     m_progressBar = new QProgressBar(this);
@@ -78,6 +89,15 @@ ToastWidget::ToastWidget(IconManager *iconManager,
         "QProgressBar::chunk{background:%1;border-radius:1px;}")
         .arg(accentColor().name()));
     root->addWidget(m_progressBar);
+
+    const int preferredWidth = qBound(
+        kMinimumToastWidth, messageLabel->sizeHint().width() + 28,
+        kMaximumToastWidth);
+    messageLabel->setMaximumWidth(preferredWidth - 28);
+    root->activate();
+    resize(preferredWidth,
+           qBound(kMinimumToastHeight, root->sizeHint().height(),
+                  maximumHeight()));
 
     connect(closeButton, &QToolButton::clicked, this, [this] {
         if (m_countdown) {
@@ -128,6 +148,14 @@ QColor ToastWidget::accentColor() const
 
 QColor ToastWidget::backgroundColor() const
 {
+    if (m_darkTheme) {
+        switch (m_type) {
+        case Type::Success: return QColor("#183529");
+        case Type::Warning: return QColor("#3A301D");
+        case Type::Error: return QColor("#3B2225");
+        case Type::Information: return QColor("#1D3040");
+        }
+    }
     switch (m_type) {
     case Type::Success: return QColor("#E8F8EF");
     case Type::Warning: return QColor("#FFF7E6");
@@ -139,6 +167,14 @@ QColor ToastWidget::backgroundColor() const
 
 QColor ToastWidget::borderColor() const
 {
+    if (m_darkTheme) {
+        switch (m_type) {
+        case Type::Success: return QColor("#2F7651");
+        case Type::Warning: return QColor("#80652B");
+        case Type::Error: return QColor("#884047");
+        case Type::Information: return QColor("#356C8C");
+        }
+    }
     switch (m_type) {
     case Type::Success: return QColor("#A9DFC0");
     case Type::Warning: return QColor("#F2CF83");
@@ -146,4 +182,14 @@ QColor ToastWidget::borderColor() const
     case Type::Information: return QColor("#A8D8F0");
     }
     return QColor("#A8D8F0");
+}
+
+QColor ToastWidget::titleColor() const
+{
+    return m_darkTheme ? QColor("#F1F5F9") : QColor("#172033");
+}
+
+QColor ToastWidget::messageColor() const
+{
+    return m_darkTheme ? QColor("#CBD5E1") : QColor("#52606D");
 }

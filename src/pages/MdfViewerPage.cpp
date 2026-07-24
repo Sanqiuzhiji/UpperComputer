@@ -1,6 +1,6 @@
 #include "MdfViewerPage.h"
 
-MdfViewerPage::MdfViewerPage(QWidget *parent)
+MdfViewerPage::MdfViewerPage(AppContext *, QWidget *parent)
     : QWidget(parent)
 {
 }

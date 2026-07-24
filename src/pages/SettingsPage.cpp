@@ -1,5 +1,9 @@
 #include "SettingsPage.h"
 
+#include "app/AppContext.h"
+#include "app/AppSettings.h"
+#include "theme/ThemeManager.h"
+
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFrame>
@@ -7,9 +11,10 @@
 #include <QScrollArea>
 #include <QVBoxLayout>
 
-SettingsPage::SettingsPage(ThemeManager *themeManager, QWidget *parent)
+SettingsPage::SettingsPage(AppContext *context, QWidget *parent)
     : QWidget(parent),
-      m_themeManager(themeManager)
+      m_settings(context->settings()),
+      m_themeManager(context->themeManager())
 {
     auto *rootLayout = new QVBoxLayout(this);
     rootLayout->setContentsMargins(28, 24, 28, 28);
@@ -46,7 +51,7 @@ SettingsPage::SettingsPage(ThemeManager *themeManager, QWidget *parent)
     contentLayout->addWidget(createSettingCard(
         tr("绘图刷新率"), tr("模拟曲线和实时曲线的目标刷新率。"), fps));
     auto *userCard = new QCheckBox(tr("显示"), this);
-    userCard->setChecked(true);
+    userCard->setChecked(m_settings->userCardVisible());
     contentLayout->addWidget(createSettingCard(
         tr("用户信息卡片"), tr("在导航栏顶部显示软件信息。"), userCard));
     connect(userCard, &QCheckBox::toggled, this, &SettingsPage::userCardVisibilityChanged);
@@ -57,11 +62,19 @@ SettingsPage::SettingsPage(ThemeManager *themeManager, QWidget *parent)
     auto *visualEffect = createOptions({tr("标准"), tr("云母"), tr("亚克力")});
     contentLayout->addWidget(createSettingCard(
         tr("窗口视觉效果"), tr("Windows 11 窗口背景效果，当前仅保留界面。"), visualEffect));
-    auto *navigation = createOptions({tr("展开"), tr("紧凑"), tr("自动")});
+    auto *navigation = new QComboBox(this);
+    navigation->addItem(tr("展开"), QVariant::fromValue(NavigationMode::Expanded));
+    navigation->addItem(tr("紧凑"), QVariant::fromValue(NavigationMode::Compact));
+    navigation->addItem(tr("自动"), QVariant::fromValue(NavigationMode::Automatic));
+    navigation->setCurrentIndex(
+        navigation->findData(QVariant::fromValue(m_settings->navigationMode())));
     contentLayout->addWidget(createSettingCard(
         tr("导航栏模式"), tr("选择展开、紧凑或根据窗口宽度自动调整。"), navigation));
-    connect(navigation, &QComboBox::currentTextChanged,
-            this, &SettingsPage::navigationModeChanged);
+    connect(navigation, &QComboBox::currentIndexChanged, this,
+            [this, navigation] {
+                emit navigationModeChanged(
+                    navigation->currentData().value<NavigationMode>());
+            });
     auto *transition = createOptions({tr("无动画"), tr("淡入"), tr("滑动")});
     contentLayout->addWidget(createSettingCard(
         tr("页面切换方式"), tr("页面切换动画将在后续版本实现。"), transition));

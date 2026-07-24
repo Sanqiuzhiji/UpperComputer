@@ -3,17 +3,16 @@
 #include <QObject>
 #include <QString>
 
-enum class ThemeMode {
-    Dark,
-    Light
-};
+#include "models/AppTypes.h"
+
+class AppSettings;
 
 class ThemeManager final : public QObject
 {
     Q_OBJECT
 
 public:
-    explicit ThemeManager(QObject *parent = nullptr);
+    explicit ThemeManager(AppSettings *settings, QObject *parent = nullptr);
 
     [[nodiscard]] ThemeMode mode() const noexcept;
     [[nodiscard]] QString modeName() const;
@@ -29,7 +28,6 @@ private:
     void apply() const;
     [[nodiscard]] QString styleSheet() const;
 
+    AppSettings *m_settings;
     ThemeMode m_mode{ThemeMode::Dark};
 };
-
-Q_DECLARE_METATYPE(ThemeMode)
