@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QColor>
 #include <QString>
 
 #include "models/AppTypes.h"
@@ -16,6 +17,7 @@ public:
 
     [[nodiscard]] ThemeMode mode() const noexcept;
     [[nodiscard]] QString modeName() const;
+    [[nodiscard]] QColor accentColor() const;
 
 public slots:
     void setMode(ThemeMode mode);

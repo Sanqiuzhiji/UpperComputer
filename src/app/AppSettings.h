@@ -5,6 +5,7 @@
 #include <QSettings>
 
 #include "models/AppTypes.h"
+#include "models/ConnectionTypes.h"
 #include "pages/PageId.h"
 
 class AppSettings final : public QObject
@@ -20,6 +21,23 @@ public:
     [[nodiscard]] PageId lastPage() const noexcept;
     [[nodiscard]] QByteArray windowGeometry() const;
     [[nodiscard]] bool windowMaximized() const noexcept;
+    [[nodiscard]] TransportType transportType() const noexcept;
+    [[nodiscard]] SerialConfig serialConfig() const;
+    [[nodiscard]] UdpConfig udpConfig() const;
+    [[nodiscard]] TcpServerConfig tcpServerConfig() const;
+    [[nodiscard]] TcpClientConfig tcpClientConfig() const;
+    [[nodiscard]] VirtualDataConfig virtualDataConfig() const;
+    [[nodiscard]] ParserMode parserMode() const noexcept;
+    [[nodiscard]] QString customProtocolId() const;
+    [[nodiscard]] TerminalDisplayMode terminalDisplayMode() const noexcept;
+    [[nodiscard]] bool terminalTimestampEnabled() const noexcept;
+    [[nodiscard]] TextEncoding textEncoding() const noexcept;
+    [[nodiscard]] bool receiveVisible() const noexcept;
+    [[nodiscard]] bool transmitVisible() const noexcept;
+    [[nodiscard]] bool ansiEnabled() const noexcept;
+    [[nodiscard]] InputMode inputMode() const noexcept;
+    [[nodiscard]] ChecksumMode checksumMode() const noexcept;
+    [[nodiscard]] LineEnding lineEnding() const noexcept;
 
 public slots:
     void setThemeMode(ThemeMode mode);
@@ -28,6 +46,23 @@ public slots:
     void setLastPage(PageId page);
     void setWindowGeometry(const QByteArray &geometry);
     void setWindowMaximized(bool maximized);
+    void setTransportType(TransportType type);
+    void setSerialConfig(const SerialConfig &config);
+    void setUdpConfig(const UdpConfig &config);
+    void setTcpServerConfig(const TcpServerConfig &config);
+    void setTcpClientConfig(const TcpClientConfig &config);
+    void setVirtualDataConfig(const VirtualDataConfig &config);
+    void setParserMode(ParserMode mode);
+    void setCustomProtocolId(const QString &protocolId);
+    void setTerminalDisplayMode(TerminalDisplayMode mode);
+    void setTerminalTimestampEnabled(bool enabled);
+    void setTextEncoding(TextEncoding encoding);
+    void setReceiveVisible(bool visible);
+    void setTransmitVisible(bool visible);
+    void setAnsiEnabled(bool enabled);
+    void setInputMode(InputMode mode);
+    void setChecksumMode(ChecksumMode mode);
+    void setLineEnding(LineEnding ending);
 
 private:
     void load();
@@ -39,4 +74,21 @@ private:
     PageId m_lastPage{PageId::Plot};
     QByteArray m_windowGeometry;
     bool m_windowMaximized{true};
+    TransportType m_transportType{TransportType::SerialPort};
+    SerialConfig m_serialConfig;
+    UdpConfig m_udpConfig;
+    TcpServerConfig m_tcpServerConfig;
+    TcpClientConfig m_tcpClientConfig;
+    VirtualDataConfig m_virtualDataConfig;
+    ParserMode m_parserMode{ParserMode::RawData};
+    QString m_customProtocolId;
+    TerminalDisplayMode m_terminalDisplayMode{TerminalDisplayMode::Text};
+    bool m_terminalTimestampEnabled{true};
+    TextEncoding m_textEncoding{TextEncoding::Utf8};
+    bool m_receiveVisible{true};
+    bool m_transmitVisible{true};
+    bool m_ansiEnabled{};
+    InputMode m_inputMode{InputMode::Text};
+    ChecksumMode m_checksumMode{ChecksumMode::None};
+    LineEnding m_lineEnding{LineEnding::None};
 };

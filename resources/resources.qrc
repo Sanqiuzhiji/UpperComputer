@@ -16,5 +16,16 @@
         <file alias="navigation/about.svg">icons/navigation/about.svg</file>
         <file alias="navigation/settings.svg">icons/navigation/settings.svg</file>
         <file alias="common/app.svg">icons/common/app.svg</file>
+        <file alias="connection/refresh.svg">icons/connection/refresh.svg</file>
+        <file alias="connection/help.svg">icons/connection/help.svg</file>
+        <file alias="connection/clock.svg">icons/connection/clock.svg</file>
+        <file alias="connection/receive.svg">icons/connection/receive.svg</file>
+        <file alias="connection/transmit.svg">icons/connection/transmit.svg</file>
+        <file alias="connection/ansi.svg">icons/connection/ansi.svg</file>
+        <file alias="connection/log.svg">icons/connection/log.svg</file>
+        <file alias="connection/clear.svg">icons/connection/clear.svg</file>
+        <file alias="connection/send.svg">icons/connection/send.svg</file>
+        <file alias="connection/text.svg">icons/connection/text.svg</file>
+        <file alias="connection/hex.svg">icons/connection/hex.svg</file>
     </qresource>
 </RCC>

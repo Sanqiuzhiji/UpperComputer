@@ -22,6 +22,11 @@ QString ThemeManager::modeName() const
     return m_mode == ThemeMode::Dark ? tr("深色") : tr("浅色");
 }
 
+QColor ThemeManager::accentColor() const
+{
+    return QColor(QStringLiteral("#28A9E0"));
+}
+
 void ThemeManager::setMode(const ThemeMode mode)
 {
     if (m_mode == mode) {
@@ -78,7 +83,7 @@ QString ThemeManager::styleSheet() const
         QPushButton[nav="true"]:checked {
             background: %7; color: #28A9E0;
         }
-        QComboBox, QSpinBox {
+        QComboBox, QSpinBox, QDoubleSpinBox {
             background: %4; border: 1px solid %5; border-radius: 5px;
             padding: 5px 8px; min-height: 22px;
         }
@@ -86,6 +91,7 @@ QString ThemeManager::styleSheet() const
         QScrollArea { border: none; background: transparent; }
         QScrollArea > QWidget > QWidget { background: transparent; }
         QStackedWidget { background: %2; }
+        QStackedWidget#hardwareConfigStack { background: transparent; }
         QCheckBox { spacing: 8px; }
         QCheckBox::indicator { width: 34px; height: 18px; }
         QCheckBox::indicator:unchecked {
@@ -99,9 +105,17 @@ QString ThemeManager::styleSheet() const
         QLabel#heroTitle { font-size: 24pt; font-weight: 700; color: #28A9E0; }
         QLabel#sectionTitle { font-weight: 700; }
         QLabel#telemetryValue { color: #28A9E0; font-weight: 600; }
-        QLineEdit, QPlainTextEdit, QTreeWidget, QTableWidget, QMdiArea {
+        QLineEdit, QTextEdit, QPlainTextEdit, QTreeWidget, QTableWidget, QMdiArea {
             background: %4; border: 1px solid %5; border-radius: 5px;
             selection-background-color: #28A9E0;
+        }
+        QLineEdit[invalid="true"] { border-color: #E5484D; }
+        QToolButton[terminalTool="true"]:checked {
+            color: #28A9E0; background: %7; border-color: %5;
+        }
+        QTextEdit#connectionTerminal {
+            padding: 7px;
+            font-family: "Cascadia Mono", "Consolas", "Microsoft YaHei UI";
         }
         QHeaderView::section { background: %3; border: none; border-bottom: 1px solid %5; padding: 6px; }
         QSplitter::handle { background: %5; }

@@ -17,9 +17,18 @@ enum class ConnectionState {
     Disconnected,
     Connecting,
     Connected,
+    Disconnecting,
+    Error
+};
+
+enum class NotificationType {
+    Information,
+    Success,
+    Warning,
     Error
 };
 
 Q_DECLARE_METATYPE(ThemeMode)
 Q_DECLARE_METATYPE(NavigationMode)
 Q_DECLARE_METATYPE(ConnectionState)
+Q_DECLARE_METATYPE(NotificationType)

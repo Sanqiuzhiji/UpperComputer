@@ -52,6 +52,10 @@ void StatusBarWidget::setConnectionState(const ConnectionState state)
         text = tr("已连接");
         color = QStringLiteral("#45B97C");
         break;
+    case ConnectionState::Disconnecting:
+        text = tr("正在断开");
+        color = QStringLiteral("#E6A23C");
+        break;
     case ConnectionState::Error:
         text = tr("连接异常");
         color = QStringLiteral("#E5484D");
@@ -86,6 +90,18 @@ void StatusBarWidget::setTransmitRate(const double bytesPerSecond)
     refreshRateText();
 }
 
+void StatusBarWidget::setReceiveTotal(const quint64 bytes)
+{
+    m_receiveTotal = bytes;
+    refreshRateText();
+}
+
+void StatusBarWidget::setTransmitTotal(const quint64 bytes)
+{
+    m_transmitTotal = bytes;
+    refreshRateText();
+}
+
 void StatusBarWidget::setCurrentPageTitle(const QString &title)
 {
     m_page->setText(tr("页面：%1").arg(title));
@@ -105,25 +121,42 @@ QString StatusBarWidget::formatRate(const double bytesPerSecond)
     if (bytesPerSecond < 1024.0 * 1024.0) {
         return tr("%1 KB/s").arg(bytesPerSecond / 1024.0, 0, 'f', 1);
     }
-    return tr("%1 MB/s").arg(
-        bytesPerSecond / (1024.0 * 1024.0), 0, 'f', 1);
+    if (bytesPerSecond < 1024.0 * 1024.0 * 1024.0) {
+        return tr("%1 MB/s").arg(
+            bytesPerSecond / (1024.0 * 1024.0), 0, 'f', 1);
+    }
+    return tr("%1 GB/s").arg(
+        bytesPerSecond / (1024.0 * 1024.0 * 1024.0), 0, 'f', 1);
+}
+
+QString StatusBarWidget::formatDataSize(const quint64 bytes)
+{
+    constexpr double kibibyte = 1024.0;
+    constexpr double mebibyte = kibibyte * 1024.0;
+    constexpr double gibibyte = mebibyte * 1024.0;
+    if (bytes < 1024) return tr("%1 B").arg(bytes);
+    if (bytes < static_cast<quint64>(mebibyte)) {
+        return tr("%1 KB").arg(bytes / kibibyte, 0, 'f', 1);
+    }
+    if (bytes < static_cast<quint64>(gibibyte)) {
+        return tr("%1 MB").arg(bytes / mebibyte, 0, 'f', 1);
+    }
+    return tr("%1 GB").arg(bytes / gibibyte, 0, 'f', 1);
 }
 
 void StatusBarWidget::refreshSourceText()
 {
-    const QString source = m_dataSourceName.isEmpty()
-        ? tr("虚拟数据") : m_dataSourceName;
-    if (m_deviceName.isEmpty()) {
-        m_source->setText(tr("数据源：%1").arg(source));
-        return;
-    }
+    const QString source = m_dataSourceName.isEmpty() ? tr("无") : m_dataSourceName;
+    const QString device = m_deviceName.isEmpty() ? tr("无") : m_deviceName;
     m_source->setText(
-        tr("设备：%1    数据源：%2").arg(m_deviceName, source));
+        tr("设备：%1    数据源：%2").arg(device, source));
 }
 
 void StatusBarWidget::refreshRateText()
 {
-    m_rates->setText(tr("接收 %1    发送 %2")
+    m_rates->setText(tr("接收 %1 (%2)    发送 %3 (%4)")
                          .arg(formatRate(m_receiveRate),
-                              formatRate(m_transmitRate)));
+                              formatDataSize(m_receiveTotal),
+                              formatRate(m_transmitRate),
+                              formatDataSize(m_transmitTotal)));
 }

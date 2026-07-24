@@ -50,7 +50,7 @@ MainWindow::MainWindow(AppContext *context, QWidget *parent)
       m_settings(context->settings()),
       m_themeManager(context->themeManager())
 {
-    m_iconManager = new IconManager(m_themeManager, this);
+    m_iconManager = m_context->iconManager();
     setWindowTitle(QStringLiteral("UpperComputer"));
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
     setAttribute(Qt::WA_NativeWindow);
@@ -69,6 +69,24 @@ MainWindow::MainWindow(AppContext *context, QWidget *parent)
     connect(m_titleBar, &TitleBar::pinToggleRequested, this, &MainWindow::setPinned);
     connect(m_navigation, &SideNavigation::pageRequested,
             this, &MainWindow::switchPage);
+    connect(m_context, &AppContext::notificationRequested, this,
+            [this](const QString &message, const NotificationType type) {
+                ToastWidget::Type toastType = ToastWidget::Type::Information;
+                switch (type) {
+                case NotificationType::Information:
+                    break;
+                case NotificationType::Success:
+                    toastType = ToastWidget::Type::Success;
+                    break;
+                case NotificationType::Warning:
+                    toastType = ToastWidget::Type::Warning;
+                    break;
+                case NotificationType::Error:
+                    toastType = ToastWidget::Type::Error;
+                    break;
+                }
+                showNotice(message, toastType);
+            });
     connect(m_themeManager, &ThemeManager::themeChanged, this, [this](ThemeMode) {
         m_statusBar->setThemeMode(m_themeManager->mode());
     });
@@ -416,12 +434,18 @@ void MainWindow::bindConnectionStatus()
             m_statusBar, &StatusBarWidget::setReceiveRate);
     connect(connection, &ConnectionManager::transmitRateChanged,
             m_statusBar, &StatusBarWidget::setTransmitRate);
+    connect(connection, &ConnectionManager::receiveTotalChanged,
+            m_statusBar, &StatusBarWidget::setReceiveTotal);
+    connect(connection, &ConnectionManager::transmitTotalChanged,
+            m_statusBar, &StatusBarWidget::setTransmitTotal);
 
     m_statusBar->setConnectionState(connection->state());
     m_statusBar->setDeviceName(connection->deviceName());
     m_statusBar->setDataSourceName(connection->dataSourceName());
     m_statusBar->setReceiveRate(connection->receiveRate());
     m_statusBar->setTransmitRate(connection->transmitRate());
+    m_statusBar->setReceiveTotal(connection->receiveTotal());
+    m_statusBar->setTransmitTotal(connection->transmitTotal());
 }
 
 void MainWindow::updateWindowStateUi()

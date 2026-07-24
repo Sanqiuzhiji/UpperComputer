@@ -10,18 +10,35 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 # Configure Qt6_DIR or CMAKE_PREFIX_PATH in the CLion CMake profile/toolchain.
-find_package(Qt6 6.11 REQUIRED COMPONENTS Core Gui Widgets Svg)
+find_package(Qt6 6.11 REQUIRED COMPONENTS
+    Core
+    Concurrent
+    Gui
+    Widgets
+    Svg
+    Network
+    SerialPort
+)
 
 qt_add_executable(UpperComputer WIN32
     main.cpp
     resources/resources.qrc
     src/models/AppTypes.h
+    src/models/ConnectionTypes.h
     src/app/AppSettings.h
     src/app/AppSettings.cpp
     src/app/AppContext.h
     src/app/AppContext.cpp
     src/services/ConnectionManager.h
     src/services/ConnectionManager.cpp
+    src/services/transports/AbstractTransport.h
+    src/services/transports/AbstractTransport.cpp
+    src/services/transports/SerialTransport.h
+    src/services/transports/SerialTransport.cpp
+    src/services/transports/NetworkTransports.h
+    src/services/transports/NetworkTransports.cpp
+    src/services/transports/VirtualTransport.h
+    src/services/transports/VirtualTransport.cpp
     src/theme/ThemeManager.h
     src/theme/ThemeManager.cpp
     src/theme/IconManager.h
@@ -33,6 +50,14 @@ qt_add_executable(UpperComputer WIN32
     src/pages/PlotPage.cpp
     src/pages/ConnectionPage.h
     src/pages/ConnectionPage.cpp
+    src/pages/connection/HardwareConfigPanel.h
+    src/pages/connection/HardwareConfigPanel.cpp
+    src/pages/connection/ParserConfigPanel.h
+    src/pages/connection/ParserConfigPanel.cpp
+    src/pages/connection/TerminalPanel.h
+    src/pages/connection/TerminalPanel.cpp
+    src/pages/connection/SendPanel.h
+    src/pages/connection/SendPanel.cpp
     src/pages/ProtocolEditorPage.h
     src/pages/ProtocolEditorPage.cpp
     src/pages/CanBusPage.h
@@ -53,21 +78,164 @@ qt_add_executable(UpperComputer WIN32
     src/widgets/ThemeTransitionOverlay.cpp
     src/widgets/ToastWidget.h
     src/widgets/ToastWidget.cpp
+    src/widgets/FocusUnderline.h
+    src/widgets/FocusUnderline.cpp
+    src/utils/ChecksumUtils.h
+    src/utils/ChecksumUtils.cpp
     src/window/MainWindow.h
     src/window/MainWindow.cpp
 )
 
 target_link_libraries(UpperComputer PRIVATE
     Qt6::Core
+    Qt6::Concurrent
     Qt6::Gui
     Qt6::Widgets
     Qt6::Svg
+    Qt6::Network
+    Qt6::SerialPort
 )
 
 target_include_directories(UpperComputer PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 if(MSVC)
     target_compile_options(UpperComputer PRIVATE /W4 /utf-8 /permissive-)
+endif()
+
+include(CTest)
+if(BUILD_TESTING)
+    qt_add_executable(ChecksumUtilsTest
+        tests/ChecksumUtilsTest.cpp
+        src/utils/ChecksumUtils.h
+        src/utils/ChecksumUtils.cpp
+        src/models/ConnectionTypes.h
+    )
+    target_include_directories(ChecksumUtilsTest PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_link_libraries(ChecksumUtilsTest PRIVATE
+        Qt6::Core
+        Qt6::SerialPort
+    )
+    if(MSVC)
+        target_compile_options(ChecksumUtilsTest PRIVATE /W4 /utf-8 /permissive-)
+    endif()
+    add_test(NAME ChecksumUtilsTest COMMAND ChecksumUtilsTest)
+
+    qt_add_executable(ConnectionManagerIntegrationTest
+        tests/ConnectionManagerIntegrationTest.cpp
+        src/models/AppTypes.h
+        src/models/ConnectionTypes.h
+        src/services/ConnectionManager.h
+        src/services/ConnectionManager.cpp
+        src/services/transports/AbstractTransport.h
+        src/services/transports/AbstractTransport.cpp
+        src/services/transports/SerialTransport.h
+        src/services/transports/SerialTransport.cpp
+        src/services/transports/NetworkTransports.h
+        src/services/transports/NetworkTransports.cpp
+        src/services/transports/VirtualTransport.h
+        src/services/transports/VirtualTransport.cpp
+    )
+    target_include_directories(ConnectionManagerIntegrationTest PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_link_libraries(ConnectionManagerIntegrationTest PRIVATE
+        Qt6::Core
+        Qt6::Network
+        Qt6::SerialPort
+    )
+    if(MSVC)
+        target_compile_options(ConnectionManagerIntegrationTest PRIVATE
+            /W4 /utf-8 /permissive-)
+    endif()
+    add_test(NAME ConnectionManagerIntegrationTest
+        COMMAND ConnectionManagerIntegrationTest)
+
+    qt_add_executable(AppSettingsPersistenceTest
+        tests/AppSettingsPersistenceTest.cpp
+        src/app/AppSettings.h
+        src/app/AppSettings.cpp
+        src/models/AppTypes.h
+        src/models/ConnectionTypes.h
+        src/pages/PageId.h
+    )
+    target_include_directories(AppSettingsPersistenceTest PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_link_libraries(AppSettingsPersistenceTest PRIVATE
+        Qt6::Core
+        Qt6::SerialPort
+    )
+    if(MSVC)
+        target_compile_options(AppSettingsPersistenceTest PRIVATE
+            /W4 /utf-8 /permissive-)
+    endif()
+    add_test(NAME AppSettingsPersistenceTest
+        COMMAND AppSettingsPersistenceTest)
+
+    qt_add_executable(ConnectionPageSmokeTest
+        tests/ConnectionPageSmokeTest.cpp
+        resources/resources.qrc
+        src/models/AppTypes.h
+        src/models/ConnectionTypes.h
+        src/pages/PageId.h
+        src/app/AppSettings.h
+        src/app/AppSettings.cpp
+        src/app/AppContext.h
+        src/app/AppContext.cpp
+        src/services/ConnectionManager.h
+        src/services/ConnectionManager.cpp
+        src/services/transports/AbstractTransport.h
+        src/services/transports/AbstractTransport.cpp
+        src/services/transports/SerialTransport.h
+        src/services/transports/SerialTransport.cpp
+        src/services/transports/NetworkTransports.h
+        src/services/transports/NetworkTransports.cpp
+        src/services/transports/VirtualTransport.h
+        src/services/transports/VirtualTransport.cpp
+        src/theme/ThemeManager.h
+        src/theme/ThemeManager.cpp
+        src/theme/IconManager.h
+        src/theme/IconManager.cpp
+        src/widgets/FocusUnderline.h
+        src/widgets/FocusUnderline.cpp
+        src/utils/ChecksumUtils.h
+        src/utils/ChecksumUtils.cpp
+        src/pages/ConnectionPage.h
+        src/pages/ConnectionPage.cpp
+        src/pages/connection/HardwareConfigPanel.h
+        src/pages/connection/HardwareConfigPanel.cpp
+        src/pages/connection/ParserConfigPanel.h
+        src/pages/connection/ParserConfigPanel.cpp
+        src/pages/connection/TerminalPanel.h
+        src/pages/connection/TerminalPanel.cpp
+        src/pages/connection/SendPanel.h
+        src/pages/connection/SendPanel.cpp
+    )
+    target_include_directories(ConnectionPageSmokeTest PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_link_libraries(ConnectionPageSmokeTest PRIVATE
+        Qt6::Core
+        Qt6::Concurrent
+        Qt6::Gui
+        Qt6::Widgets
+        Qt6::Svg
+        Qt6::Network
+        Qt6::SerialPort
+    )
+    if(MSVC)
+        target_compile_options(ConnectionPageSmokeTest PRIVATE
+            /W4 /utf-8 /permissive-)
+    endif()
+    add_test(NAME ConnectionPageSmokeTest COMMAND ConnectionPageSmokeTest)
+    if(WIN32)
+        add_custom_command(TARGET ConnectionPageSmokeTest POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                    "$<TARGET_FILE_DIR:ConnectionPageSmokeTest>/platforms"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "$<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin>"
+                    "$<TARGET_FILE_DIR:ConnectionPageSmokeTest>/platforms"
+            COMMENT "Deploying the offscreen Qt platform for UI smoke tests"
+        )
+    endif()
 endif()
 
 # Keep the build output directly runnable outside CLion. copy_if_different
@@ -78,9 +246,12 @@ if(WIN32)
                 "$<TARGET_FILE_DIR:UpperComputer>/platforms"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "$<TARGET_FILE:Qt6::Core>"
+                "$<TARGET_FILE:Qt6::Concurrent>"
                 "$<TARGET_FILE:Qt6::Gui>"
                 "$<TARGET_FILE:Qt6::Widgets>"
                 "$<TARGET_FILE:Qt6::Svg>"
+                "$<TARGET_FILE:Qt6::Network>"
+                "$<TARGET_FILE:Qt6::SerialPort>"
                 "$<TARGET_FILE_DIR:UpperComputer>"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "$<TARGET_FILE:Qt6::QWindowsIntegrationPlugin>"

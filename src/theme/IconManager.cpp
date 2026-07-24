@@ -59,6 +59,12 @@ QIcon IconManager::buildIcon(const QString &resourcePath,
     result.addPixmap(
         renderedPixmap(resourcePath, size, activeColor, degrees), QIcon::Selected);
     result.addPixmap(
+        renderedPixmap(resourcePath, size, activeColor, degrees),
+        QIcon::Normal, QIcon::On);
+    result.addPixmap(
+        renderedPixmap(resourcePath, size, activeColor, degrees),
+        QIcon::Active, QIcon::On);
+    result.addPixmap(
         renderedPixmap(resourcePath, size, disabled, degrees), QIcon::Disabled);
     m_iconCache.insert(key, result);
     return result;
