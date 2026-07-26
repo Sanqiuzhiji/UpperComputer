@@ -31,6 +31,7 @@ public:
     [[nodiscard]] ParserMode parserMode() const noexcept;
     [[nodiscard]] SendMode sendMode() const noexcept;
     [[nodiscard]] QString customProtocolId() const;
+    [[nodiscard]] QString customReceiveCommandId() const;
     [[nodiscard]] TerminalDisplayMode terminalDisplayMode() const noexcept;
     [[nodiscard]] bool terminalTimestampEnabled() const noexcept;
     [[nodiscard]] TextEncoding textEncoding() const noexcept;
@@ -44,6 +45,8 @@ public:
     [[nodiscard]] QString rawHexDraft() const;
     [[nodiscard]] QString customCommandId() const;
     [[nodiscard]] QVariantMap customFieldDrafts() const;
+    [[nodiscard]] QString workspaceDirectory() const;
+    [[nodiscard]] static QString defaultWorkspaceDirectory();
 
 public slots:
     void setThemeMode(ThemeMode mode);
@@ -61,6 +64,7 @@ public slots:
     void setParserMode(ParserMode mode);
     void setSendMode(SendMode mode);
     void setCustomProtocolId(const QString &protocolId);
+    void setCustomReceiveCommandId(const QString &commandId);
     void setTerminalDisplayMode(TerminalDisplayMode mode);
     void setTerminalTimestampEnabled(bool enabled);
     void setTextEncoding(TextEncoding encoding);
@@ -74,6 +78,10 @@ public slots:
     void setRawHexDraft(const QString &draft);
     void setCustomCommandId(const QString &commandId);
     void setCustomFieldDrafts(const QVariantMap &drafts);
+    void setWorkspaceDirectory(const QString &directory);
+
+signals:
+    void workspaceDirectoryChanged(const QString &directory);
 
 private:
     void load();
@@ -94,6 +102,7 @@ private:
     ParserMode m_parserMode{ParserMode::RawData};
     SendMode m_sendMode{SendMode::RawData};
     QString m_customProtocolId;
+    QString m_customReceiveCommandId;
     TerminalDisplayMode m_terminalDisplayMode{TerminalDisplayMode::Text};
     bool m_terminalTimestampEnabled{true};
     TextEncoding m_textEncoding{TextEncoding::Utf8};
@@ -107,4 +116,5 @@ private:
     QString m_rawHexDraft;
     QString m_customCommandId;
     QVariantMap m_customFieldDrafts;
+    QString m_workspaceDirectory;
 };

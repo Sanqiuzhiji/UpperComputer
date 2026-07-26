@@ -1,5 +1,7 @@
 #include "AppSettings.h"
 
+#include <QDir>
+
 namespace {
 constexpr auto kThemeModeKey = "appearance/themeMode";
 constexpr auto kNavigationModeKey = "navigation/mode";
@@ -26,6 +28,10 @@ constexpr auto kVirtualAmplitudeKey = "connection/virtual/amplitude";
 constexpr auto kVirtualChannelsKey = "connection/virtual/channelCount";
 constexpr auto kParserModeKey = "connection/parser/mode";
 constexpr auto kCustomProtocolKey = "connection/parser/customProtocolId";
+constexpr auto kCustomReceiveCommandKey =
+    "connection/parser/customReceiveCommandId";
+constexpr auto kLegacyCustomReceiveFrameKey =
+    "connection/parser/customReceiveFrameId";
 constexpr auto kSendModeKey = "connection/send/mode";
 constexpr auto kTerminalDisplayKey = "connection/terminal/displayMode";
 constexpr auto kTimestampKey = "connection/terminal/timestamp";
@@ -40,6 +46,7 @@ constexpr auto kRawTextDraftKey = "connection/send/rawTextDraft";
 constexpr auto kRawHexDraftKey = "connection/send/rawHexDraft";
 constexpr auto kCustomCommandKey = "connection/send/customCommandId";
 constexpr auto kCustomFieldDraftsKey = "connection/send/customFieldDrafts";
+constexpr auto kWorkspaceDirectoryKey = "workspace/directory";
 
 template<typename Enum>
 int enumValue(const Enum value)
@@ -129,6 +136,11 @@ QString AppSettings::customProtocolId() const
     return m_customProtocolId;
 }
 
+QString AppSettings::customReceiveCommandId() const
+{
+    return m_customReceiveCommandId;
+}
+
 TerminalDisplayMode AppSettings::terminalDisplayMode() const noexcept
 {
     return m_terminalDisplayMode;
@@ -192,6 +204,21 @@ QString AppSettings::customCommandId() const
 QVariantMap AppSettings::customFieldDrafts() const
 {
     return m_customFieldDrafts;
+}
+
+QString AppSettings::workspaceDirectory() const
+{
+    return m_workspaceDirectory;
+}
+
+QString AppSettings::defaultWorkspaceDirectory()
+{
+#ifdef UPPERCOMPUTER_PROJECT_DIR
+    return QDir(QStringLiteral(UPPERCOMPUTER_PROJECT_DIR))
+        .filePath(QStringLiteral("workspaces"));
+#else
+    return QDir::current().filePath(QStringLiteral("workspaces"));
+#endif
 }
 
 void AppSettings::setThemeMode(const ThemeMode mode)
@@ -322,6 +349,15 @@ void AppSettings::setCustomProtocolId(const QString &protocolId)
     m_store.setValue(QLatin1String(kCustomProtocolKey), protocolId);
 }
 
+void AppSettings::setCustomReceiveCommandId(
+    const QString &commandId)
+{
+    if (m_customReceiveCommandId == commandId) return;
+    m_customReceiveCommandId = commandId;
+    m_store.setValue(
+        QLatin1String(kCustomReceiveCommandKey), commandId);
+}
+
 void AppSettings::setTerminalDisplayMode(const TerminalDisplayMode mode)
 {
     if (m_terminalDisplayMode == mode) return;
@@ -413,6 +449,17 @@ void AppSettings::setCustomFieldDrafts(const QVariantMap &drafts)
     m_store.setValue(QLatin1String(kCustomFieldDraftsKey), drafts);
 }
 
+void AppSettings::setWorkspaceDirectory(const QString &directory)
+{
+    const QString normalized = QDir::cleanPath(directory.trimmed());
+    const QString target = normalized.isEmpty()
+        ? defaultWorkspaceDirectory() : normalized;
+    if (m_workspaceDirectory == target) return;
+    m_workspaceDirectory = target;
+    m_store.setValue(QLatin1String(kWorkspaceDirectoryKey), target);
+    emit workspaceDirectoryChanged(target);
+}
+
 void AppSettings::load()
 {
     const int theme = m_store.value(
@@ -501,6 +548,10 @@ void AppSettings::load()
         enumValue(SendMode::CustomBinary)));
     m_customProtocolId =
         m_store.value(QLatin1String(kCustomProtocolKey)).toString();
+    m_customReceiveCommandId = m_store.value(
+        QLatin1String(kCustomReceiveCommandKey),
+        m_store.value(
+            QLatin1String(kLegacyCustomReceiveFrameKey))).toString();
     m_terminalDisplayMode = static_cast<TerminalDisplayMode>(qBound(
         enumValue(TerminalDisplayMode::Text),
         m_store.value(QLatin1String(kTerminalDisplayKey),
@@ -541,4 +592,8 @@ void AppSettings::load()
         m_store.value(QLatin1String(kCustomCommandKey)).toString();
     m_customFieldDrafts =
         m_store.value(QLatin1String(kCustomFieldDraftsKey)).toMap();
+    m_workspaceDirectory = QDir::cleanPath(
+        m_store.value(
+            QLatin1String(kWorkspaceDirectoryKey),
+            defaultWorkspaceDirectory()).toString());
 }

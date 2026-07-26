@@ -49,20 +49,16 @@ HardwareConfigPanel::HardwareConfigPanel(AppContext *context, QWidget *parent)
 {
     setProperty("card", true);
     setObjectName(QStringLiteral("hardwareConfigPanel"));
-    setMinimumHeight(164);
-    setMaximumHeight(188);
+    setMinimumHeight(78);
+    setMaximumHeight(92);
 
-    auto *root = new QVBoxLayout(this);
-    root->setContentsMargins(16, 13, 16, 13);
-    root->setSpacing(10);
-
-    auto *header = new QHBoxLayout;
-    header->setSpacing(10);
+    auto *root = new QHBoxLayout(this);
+    root->setContentsMargins(14, 8, 14, 8);
+    root->setSpacing(8);
     auto *title = new QLabel(tr("硬件配置"), this);
     title->setObjectName(QStringLiteral("sectionTitle"));
-    header->addWidget(title);
-    header->addStretch();
-    header->addWidget(fieldLabel(tr("硬件类型"), this));
+    root->addWidget(title);
+    root->addWidget(fieldLabel(tr("类型"), this));
 
     m_transportCombo = new QComboBox(this);
     addEnumItem(m_transportCombo, tr("串口"), TransportType::SerialPort);
@@ -70,23 +66,22 @@ HardwareConfigPanel::HardwareConfigPanel(AppContext *context, QWidget *parent)
     addEnumItem(m_transportCombo, tr("TCP 服务端"), TransportType::TcpServer);
     addEnumItem(m_transportCombo, tr("TCP 客户端"), TransportType::TcpClient);
     addEnumItem(m_transportCombo, tr("虚拟数据"), TransportType::VirtualData);
-    m_transportCombo->setMinimumWidth(128);
+    m_transportCombo->setMinimumWidth(108);
     installUnderline(m_transportCombo);
-    header->addWidget(m_transportCombo);
-
-    m_connectionSwitch = new QCheckBox(tr("连接"), this);
-    header->addWidget(m_connectionSwitch);
-    root->addLayout(header);
+    root->addWidget(m_transportCombo);
 
     m_configStack = new QStackedWidget(this);
     m_configStack->setObjectName(QStringLiteral("hardwareConfigStack"));
-    m_configStack->setFixedHeight(82);
+    m_configStack->setFixedHeight(58);
     m_configStack->addWidget(createSerialPage());
     m_configStack->addWidget(createUdpPage());
     m_configStack->addWidget(createTcpServerPage());
     m_configStack->addWidget(createTcpClientPage());
     m_configStack->addWidget(createVirtualPage());
-    root->addWidget(m_configStack);
+    root->addWidget(m_configStack, 1);
+
+    m_connectionSwitch = new QCheckBox(tr("连接"), this);
+    root->addWidget(m_connectionSwitch);
 
     loadSettings();
     connect(m_transportCombo, &QComboBox::currentIndexChanged, this,
@@ -467,7 +462,26 @@ void HardwareConfigPanel::updateUiForState()
         || m_state == ConnectionState::Connected
         || m_state == ConnectionState::Disconnecting;
     m_transportCombo->setEnabled(!busy);
-    m_configStack->setEnabled(!busy);
+    // Keep the stack enabled so its descriptive labels retain their normal
+    // palette and font rendering. Lock only the actual configuration editors.
+    m_configStack->setEnabled(true);
+    const QList<QWidget *> configurationEditors{
+        m_serialPort, m_baudRate, m_dataBits, m_parity, m_stopBits,
+        m_refreshButton,
+        m_udpRemoteAddress, m_udpRemotePort, m_udpLocalPort,
+        m_tcpServerPort,
+        m_tcpClientHost, m_tcpClientPort, m_tcpClientName,
+        m_virtualInterval, m_virtualFrequency, m_virtualAmplitude,
+        m_virtualChannels
+    };
+    for (QWidget *editor : configurationEditors) {
+        if (editor) editor->setEnabled(!busy);
+    }
+    if (m_tcpClients) {
+        m_tcpClients->setEnabled(
+            m_state == ConnectionState::Connected
+            && transportType() == TransportType::TcpServer);
+    }
     // Connecting stays cancellable; Disconnecting is locked to prevent races.
     m_connectionSwitch->setEnabled(
         m_state != ConnectionState::Disconnecting);

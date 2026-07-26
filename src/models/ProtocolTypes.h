@@ -45,6 +45,12 @@ enum class ChecksumAlgorithm {
     Crc8
 };
 
+enum class FrameDirection {
+    Bidirectional,
+    TransmitOnly,
+    ReceiveOnly
+};
+
 struct Field {
     QUuid id;
     QString name;
@@ -63,6 +69,7 @@ struct Field {
 struct Frame {
     QUuid id;
     QString name;
+    FrameDirection direction{FrameDirection::Bidirectional};
     QVector<Field> fields;
 
     bool operator==(const Frame &) const = default;
@@ -125,3 +132,4 @@ Q_DECLARE_METATYPE(ProtocolModel::FieldRole)
 Q_DECLARE_METATYPE(ProtocolModel::DataType)
 Q_DECLARE_METATYPE(ProtocolModel::ByteOrder)
 Q_DECLARE_METATYPE(ProtocolModel::ChecksumAlgorithm)
+Q_DECLARE_METATYPE(ProtocolModel::FrameDirection)

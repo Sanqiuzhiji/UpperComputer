@@ -15,19 +15,29 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include <functional>
+#include <utility>
+
 using namespace ProtocolModel;
 
 namespace {
 
+constexpr int kProtocolFrameHeight = 120;
+
 class FrameDragHandle final : public QToolButton
 {
 public:
-    explicit FrameDragHandle(const QUuid &frameId, QWidget *parent)
+    explicit FrameDragHandle(
+        QWidget *dragPreview,
+        std::function<void(const QPoint &)> startDrag,
+        QWidget *parent)
         : QToolButton(parent),
-          m_frameId(frameId)
+          m_dragPreview(dragPreview),
+          m_startDrag(std::move(startDrag))
     {
         setText(QStringLiteral("⋮⋮"));
         setToolTip(QStringLiteral("拖动协议帧"));
+        setObjectName(QStringLiteral("protocolFrameDragHandle"));
         setCursor(Qt::OpenHandCursor);
         setFixedWidth(28);
     }
@@ -37,32 +47,31 @@ protected:
     {
         if (event->button() == Qt::LeftButton) {
             m_start = event->position().toPoint();
+            m_dragArmed = true;
         }
         QToolButton::mousePressEvent(event);
     }
 
     void mouseMoveEvent(QMouseEvent *event) override
     {
-        if (!(event->buttons() & Qt::LeftButton)
+        if (!m_dragArmed
+            || !(event->buttons() & Qt::LeftButton)
             || (event->position().toPoint() - m_start).manhattanLength()
                 < QApplication::startDragDistance()) {
             QToolButton::mouseMoveEvent(event);
             return;
         }
-        auto *mime = new QMimeData;
-        mime->setData(
-            QLatin1String(ProtocolMime::Frame),
-            m_frameId.toString(QUuid::WithoutBraces).toUtf8());
-        auto *drag = new QDrag(this);
-        drag->setMimeData(mime);
-        drag->setPixmap(parentWidget()->grab());
-        drag->setHotSpot(mapTo(parentWidget(), m_start));
-        drag->exec(Qt::MoveAction);
+        const QPoint hotSpot = mapTo(m_dragPreview, m_start);
+        m_dragArmed = false;
+        m_startDrag(hotSpot);
+        event->accept();
     }
 
 private:
-    QUuid m_frameId;
+    QWidget *m_dragPreview{};
+    std::function<void(const QPoint &)> m_startDrag;
     QPoint m_start;
+    bool m_dragArmed{false};
 };
 
 FieldRole roleFromMime(const QByteArray &data)
@@ -91,7 +100,10 @@ ProtocolFrameWidget::ProtocolFrameWidget(
     setProperty("protocolFrame", true);
     setProperty("selected", false);
     setAcceptDrops(true);
-    setMinimumHeight(64);
+    setFixedHeight(kProtocolFrameHeight);
+    QSizePolicy frameSizePolicy = sizePolicy();
+    frameSizePolicy.setVerticalPolicy(QSizePolicy::Fixed);
+    setSizePolicy(frameSizePolicy);
 
     bool hasError = false;
     bool hasWarning = false;
@@ -116,20 +128,48 @@ ProtocolFrameWidget::ProtocolFrameWidget(
     auto *infoLayout = new QHBoxLayout(info);
     infoLayout->setContentsMargins(0, 0, 2, 0);
     infoLayout->setSpacing(3);
-    infoLayout->addWidget(new FrameDragHandle(frame.id, info));
+    infoLayout->addWidget(new FrameDragHandle(
+        this,
+        [this](const QPoint &hotSpot) {
+            startFrameDrag(hotSpot);
+        },
+        info));
     auto *details = new QVBoxLayout;
     details->setSpacing(1);
-    auto *status = new QLabel(
-        hasError ? QStringLiteral("● 错误")
-                 : hasWarning ? QStringLiteral("● 警告")
-                              : QStringLiteral("● 有效"),
-        info);
-    status->setProperty(
-        "validationState",
-        hasError ? "error" : hasWarning ? "warning" : "valid");
     auto *statusLine = new QHBoxLayout;
     statusLine->setSpacing(3);
-    statusLine->addWidget(status, 1);
+    QString directionText;
+    switch (frame.direction) {
+    case FrameDirection::Bidirectional:
+        directionText = QStringLiteral("Tx / Rx");
+        break;
+    case FrameDirection::TransmitOnly:
+        directionText = QStringLiteral("Tx");
+        break;
+    case FrameDirection::ReceiveOnly:
+        directionText = QStringLiteral("Rx");
+        break;
+    }
+    auto *direction = new QLabel(directionText, info);
+    direction->setProperty("muted", true);
+    direction->setToolTip(
+        frame.direction == FrameDirection::Bidirectional
+            ? QStringLiteral("双向 Frame")
+        : frame.direction == FrameDirection::TransmitOnly
+            ? QStringLiteral("仅发送 Frame")
+            : QStringLiteral("仅接收 Frame"));
+    statusLine->addWidget(direction);
+    if (hasError || hasWarning) {
+        auto *status = new QLabel(
+            hasError ? QStringLiteral("● 错误")
+                     : QStringLiteral("● 警告"),
+            info);
+        status->setProperty(
+            "validationState",
+            hasError ? "error" : "warning");
+        statusLine->addWidget(status);
+    }
+    statusLine->addStretch();
     auto *deleteButton = new QToolButton(info);
     deleteButton->setObjectName(QStringLiteral("protocolFrameDeleteButton"));
     deleteButton->setProperty("protocolDeleteButton", true);
@@ -220,9 +260,46 @@ void ProtocolFrameWidget::setSelection(
 void ProtocolFrameWidget::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
+        m_frameDragStart = event->position().toPoint();
+        m_frameDragArmed = true;
         emit frameSelected(m_frame.id);
+        event->accept();
+        return;
     }
     QFrame::mousePressEvent(event);
+}
+
+void ProtocolFrameWidget::mouseMoveEvent(QMouseEvent *event)
+{
+    if (!m_frameDragArmed
+        || !(event->buttons() & Qt::LeftButton)
+        || (event->position().toPoint() - m_frameDragStart).manhattanLength()
+            < QApplication::startDragDistance()) {
+        QFrame::mouseMoveEvent(event);
+        return;
+    }
+    const QPoint hotSpot = m_frameDragStart;
+    m_frameDragArmed = false;
+    startFrameDrag(hotSpot);
+    event->accept();
+}
+
+void ProtocolFrameWidget::startFrameDrag(const QPoint &hotSpot)
+{
+    auto *mime = new QMimeData;
+    mime->setData(
+        QLatin1String(ProtocolMime::Frame),
+        m_frame.id.toString(QUuid::WithoutBraces).toUtf8());
+    auto *drag = new QDrag(this);
+    drag->setMimeData(mime);
+    QPixmap preview = grab();
+    preview.setDevicePixelRatio(devicePixelRatioF());
+    drag->setPixmap(preview);
+    drag->setHotSpot(hotSpot);
+    setCursor(Qt::ClosedHandCursor);
+    drag->exec(Qt::MoveAction, Qt::MoveAction);
+    unsetCursor();
+    emit frameDragFinished();
 }
 
 void ProtocolFrameWidget::dragEnterEvent(QDragEnterEvent *event)

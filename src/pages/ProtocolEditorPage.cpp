@@ -15,12 +15,11 @@
 #include <QHBoxLayout>
 #include <QKeySequence>
 #include <QLabel>
-#include <QMessageBox>
-#include <QPushButton>
 #include <QSignalBlocker>
 #include <QSize>
 #include <QSplitter>
 #include <QToolButton>
+#include <QTimer>
 #include <QUndoCommand>
 #include <QUndoStack>
 #include <QVBoxLayout>
@@ -115,14 +114,15 @@ ProtocolEditorPage::ProtocolEditorPage(
     connect(m_context->iconManager(), &IconManager::iconsChanged,
             this, &ProtocolEditorPage::refreshIcons);
 
-    const QList<ProtocolSummary> protocols =
+    const QList<ProtocolSummary> workspaces =
         m_repository->availableProtocols();
-    if (protocols.isEmpty()) {
+    if (workspaces.isEmpty()) {
         newTemporaryDocument();
     } else if (const auto document =
-                   m_repository->protocolById(protocols.constFirst().id)) {
+                   m_repository->protocolById(
+                       workspaces.constFirst().id)) {
         setDocument(
-            *document, protocols.constFirst().filePath, false);
+            *document, workspaces.constFirst().filePath, false);
     }
 }
 
@@ -166,6 +166,9 @@ void ProtocolEditorPage::createUi()
         QComboBox::AdjustToMinimumContentsLengthWithIcon);
     m_protocolCombo->setMinimumContentsLength(22);
     topLayout->addWidget(m_protocolCombo, 1);
+    addToolButton(
+        m_deleteWorkspaceAction,
+        QStringLiteral("workspaceDeleteButton"));
     topLayout->addSpacing(4);
 
     addToolButton(m_rescanAction, QStringLiteral("protocolRescanButton"));
@@ -176,7 +179,6 @@ void ProtocolEditorPage::createUi()
     addToolButton(m_redoAction, QStringLiteral("protocolRedoButton"));
     addToolButton(m_copyAction, QStringLiteral("protocolCopyButton"));
     addToolButton(m_pasteAction, QStringLiteral("protocolPasteButton"));
-    addToolButton(m_deleteAction, QStringLiteral("protocolDeleteButton"));
     topLayout->addSpacing(6);
     addToolButton(m_importAction, QStringLiteral("protocolImportButton"));
     addToolButton(m_saveAction, QStringLiteral("protocolSaveButton"));
@@ -261,11 +263,12 @@ void ProtocolEditorPage::createActions()
     m_pasteAction = action(
         QStringLiteral("粘贴"), QStringLiteral("粘贴 (Ctrl+V)"),
         QKeySequence::Paste);
-    m_deleteAction = action(
-        QStringLiteral("删除"), QStringLiteral("删除当前选择 (Delete)"),
-        QKeySequence::Delete);
+    m_deleteWorkspaceAction = action(
+        QStringLiteral("删除工作空间"),
+        QStringLiteral("删除当前工作空间文件"),
+        {});
     m_importAction = action(
-        QStringLiteral("导入"), QStringLiteral("导入协议文件 (Ctrl+O)"),
+        QStringLiteral("打开"), QStringLiteral("打开工作空间文件 (Ctrl+O)"),
         QKeySequence::Open);
     m_saveAction = action(
         QStringLiteral("保存"), QStringLiteral("保存 (Ctrl+S)"),
@@ -294,8 +297,8 @@ void ProtocolEditorPage::createActions()
             this, &ProtocolEditorPage::copySelection);
     connect(m_pasteAction, &QAction::triggered,
             this, &ProtocolEditorPage::pasteSelection);
-    connect(m_deleteAction, &QAction::triggered,
-            this, &ProtocolEditorPage::deleteSelection);
+    connect(m_deleteWorkspaceAction, &QAction::triggered,
+            this, &ProtocolEditorPage::deleteCurrentWorkspace);
     connect(m_importAction, &QAction::triggered,
             this, &ProtocolEditorPage::importProtocol);
     connect(m_saveAction, &QAction::triggered, this, [this] {
@@ -347,7 +350,8 @@ void ProtocolEditorPage::refreshIcons()
     set(m_redoAction, QStringLiteral(":/icons/protocol/redo.svg"));
     set(m_copyAction, QStringLiteral(":/icons/protocol/copy.svg"));
     set(m_pasteAction, QStringLiteral(":/icons/protocol/paste.svg"));
-    set(m_deleteAction, QStringLiteral(":/icons/protocol/delete.svg"));
+    set(m_deleteWorkspaceAction,
+        QStringLiteral(":/icons/protocol/delete.svg"));
     set(m_importAction, QStringLiteral(":/icons/protocol/import.svg"));
     set(m_saveAction, QStringLiteral(":/icons/protocol/save.svg"));
     set(m_saveAsAction, QStringLiteral(":/icons/protocol/save_as.svg"));
@@ -370,6 +374,10 @@ void ProtocolEditorPage::refreshProtocolCombo()
             currentAdded = true;
         }
         m_protocolCombo->addItem(name, summary.id);
+        m_protocolCombo->setItemData(
+            m_protocolCombo->count() - 1,
+            summary.filePath,
+            Qt::ToolTipRole);
     }
     if (!currentAdded && !m_document.id.isNull()) {
         QString name = m_document.name;
@@ -421,8 +429,8 @@ void ProtocolEditorPage::updateActionStates()
     m_redoAction->setEnabled(m_undoStack->canRedo());
     const bool hasSelection = !m_selectedFrameId.isNull();
     m_copyAction->setEnabled(hasSelection);
-    m_deleteAction->setEnabled(
-        hasSelection || !m_document.id.isNull());
+    m_deleteWorkspaceAction->setEnabled(
+        !m_temporary && !m_document.id.isNull());
     const bool validFieldTarget =
         m_clipboardKind == ClipboardKind::Field && hasSelection;
     const bool validFrameTarget =
@@ -439,6 +447,7 @@ void ProtocolEditorPage::setDocument(
     const QString &filePath,
     const bool temporary)
 {
+    resetDeleteWorkspaceConfirmation();
     m_document = document;
     m_filePath = filePath;
     m_temporary = temporary;
@@ -482,23 +491,6 @@ void ProtocolEditorPage::applySnapshot(
 
 bool ProtocolEditorPage::maybeSaveChanges()
 {
-    if (!hasUnsavedChanges()) return true;
-    QMessageBox message(
-        QMessageBox::Warning,
-        QStringLiteral("未保存的修改"),
-        QStringLiteral("协议“%1”包含未保存修改。")
-            .arg(m_document.name),
-        QMessageBox::NoButton,
-        this);
-    QPushButton *saveButton =
-        message.addButton(QStringLiteral("保存"), QMessageBox::AcceptRole);
-    message.addButton(QStringLiteral("放弃"), QMessageBox::DestructiveRole);
-    QPushButton *cancelButton =
-        message.addButton(QStringLiteral("取消"), QMessageBox::RejectRole);
-    message.setDefaultButton(saveButton);
-    message.exec();
-    if (message.clickedButton() == cancelButton) return false;
-    if (message.clickedButton() == saveButton) return saveDocument(false);
     return true;
 }
 
@@ -510,14 +502,13 @@ bool ProtocolEditorPage::saveDocument(const bool saveAs)
         documentToSave.id = QUuid::createUuid();
     }
     QString target = saveAs ? QString{} : m_filePath;
-    if (target.isEmpty()) {
+    if (saveAs) {
         target = QFileDialog::getSaveFileName(
             this,
-            saveAs ? QStringLiteral("协议另存为")
-                   : QStringLiteral("保存协议"),
+            QStringLiteral("工作空间另存为"),
             QDir(m_repository->directoryPath()).filePath(
                 m_document.name + QStringLiteral(".ucproto.json")),
-            QStringLiteral("UpperComputer Protocol (*.ucproto.json)"));
+            QStringLiteral("UpperComputer Workspace (*.ucproto.json)"));
         if (target.isEmpty()) return false;
     }
     QString savedPath;
@@ -584,7 +575,7 @@ void ProtocolEditorPage::newTemporaryDocument()
     ++m_untitledCounter;
     setDocument(
         makeDocument(
-            QStringLiteral("Untitled Protocol %1")
+            QStringLiteral("Untitled Workspace %1")
                 .arg(m_untitledCounter)),
         {}, true);
 }
@@ -628,59 +619,79 @@ void ProtocolEditorPage::importProtocol()
 {
     if (!maybeSaveChanges()) return;
     const QString source = QFileDialog::getOpenFileName(
-        this, QStringLiteral("导入协议文件"), {},
-        QStringLiteral("UpperComputer Protocol (*.ucproto.json);;"
+        this, QStringLiteral("打开工作空间文件"), {},
+        QStringLiteral("UpperComputer Workspace (*.ucproto.json);;"
                        "JSON (*.json)"));
     if (source.isEmpty()) return;
-    QString importedId;
+    Document document;
     QString error;
-    if (!m_repository->importFile(source, &importedId, &error)) {
+    if (!m_repository->openFile(source, &document, &error)) {
         notify(
-            QStringLiteral("导入失败：%1").arg(error),
+            QStringLiteral("打开失败：%1").arg(error),
             NotificationType::Error);
         return;
     }
+    setDocument(document, QFileInfo(source).absoluteFilePath(), false);
+}
+
+void ProtocolEditorPage::deleteCurrentWorkspace()
+{
+    if (m_temporary || m_document.id.isNull()) return;
+
+    if (!m_deleteWorkspaceArmed) {
+        m_deleteWorkspaceArmed = true;
+        const quint64 token =
+            ++m_deleteWorkspaceConfirmationToken;
+        m_deleteWorkspaceAction->setText(
+            QStringLiteral("确认删除"));
+        m_deleteWorkspaceAction->setToolTip(
+            QStringLiteral("再次点击，永久删除当前工作空间"));
+        notify(
+            QStringLiteral(
+                "再次点击删除按钮以永久删除工作空间“%1”")
+                .arg(m_document.name),
+            NotificationType::Warning);
+        QTimer::singleShot(5000, this, [this, token] {
+            if (token == m_deleteWorkspaceConfirmationToken) {
+                resetDeleteWorkspaceConfirmation();
+            }
+        });
+        return;
+    }
+    resetDeleteWorkspaceConfirmation();
+    QString error;
+    if (!m_repository->remove(
+            normalizedId(m_document.id), &error)) {
+        notify(
+            QStringLiteral("删除失败：%1").arg(error),
+            NotificationType::Error);
+        return;
+    }
+
+    const QList<ProtocolSummary> remaining =
+        m_repository->availableProtocols();
+    if (remaining.isEmpty()) {
+        newTemporaryDocument();
+        return;
+    }
+    const ProtocolSummary &next = remaining.constFirst();
     if (const auto document =
-            m_repository->protocolById(importedId)) {
-        setDocument(
-            *document,
-            m_repository->filePathForId(importedId),
-            false);
+            m_repository->protocolById(next.id)) {
+        setDocument(*document, next.filePath, false);
+    } else {
+        newTemporaryDocument();
     }
 }
 
-void ProtocolEditorPage::deleteSelection()
+void ProtocolEditorPage::resetDeleteWorkspaceConfirmation()
 {
-    const int framePosition = frameIndex(m_selectedFrameId);
-    if (framePosition >= 0 && !m_selectedFieldId.isNull()) {
-        deleteField(m_selectedFrameId, m_selectedFieldId);
-        return;
-    }
-    if (framePosition >= 0) {
-        deleteFrame(m_selectedFrameId);
-        return;
-    }
-
-    if (QMessageBox::question(
-            this, QStringLiteral("删除协议"),
-            m_temporary
-                ? QStringLiteral("确定放弃当前临时协议吗？")
-                : QStringLiteral("确定删除协议文件“%1”吗？此操作无法撤销。")
-                      .arg(m_document.name))
-        != QMessageBox::Yes) {
-        return;
-    }
-    if (!m_temporary) {
-        QString error;
-        if (!m_repository->remove(
-                normalizedId(m_document.id), &error)) {
-            notify(
-                QStringLiteral("删除失败：%1").arg(error),
-                NotificationType::Error);
-            return;
-        }
-    }
-    newTemporaryDocument();
+    ++m_deleteWorkspaceConfirmationToken;
+    m_deleteWorkspaceArmed = false;
+    if (!m_deleteWorkspaceAction) return;
+    m_deleteWorkspaceAction->setText(
+        QStringLiteral("删除工作空间"));
+    m_deleteWorkspaceAction->setToolTip(
+        QStringLiteral("删除当前工作空间文件"));
 }
 
 void ProtocolEditorPage::deleteFrame(const QUuid &frameId)
@@ -766,7 +777,7 @@ void ProtocolEditorPage::pasteSelection()
         for (int index = 0; index < copy.fields.size(); ++index) {
             copy.fields[index].name = uniqueFieldName(
                 copy.fields.at(index).name,
-                Frame{copy.id, copy.name,
+                Frame{copy.id, copy.name, copy.direction,
                       copy.fields.mid(0, index)});
         }
         const int selectedFrame = frameIndex(m_selectedFrameId);

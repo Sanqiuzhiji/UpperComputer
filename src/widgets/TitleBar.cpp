@@ -29,8 +29,15 @@ TitleBar::TitleBar(IconManager *iconManager, QWidget *parent)
     QFont nameFont = name->font();
     nameFont.setBold(true);
     name->setFont(nameFont);
-    m_pageTitle = new QLabel(tr("Plot"), this);
-    m_pageTitle->setObjectName(QStringLiteral("titlePageName"));
+    m_connectionButton = createButton(
+        QStringLiteral(":/icons/navigation/connection.svg"),
+        tr("连接设备"), QSize(42, 42));
+    m_connectionButton->setObjectName(
+        QStringLiteral("quickConnectionButton"));
+    m_connectionButton->setProperty("connectionQuick", true);
+    m_connectionButton->setCheckable(true);
+    connect(m_connectionButton, &QToolButton::clicked,
+            this, &TitleBar::connectionToggleRequested);
 
     m_pinButton = createButton(QStringLiteral(":/icons/titlebar/pin.svg"),
                                tr("窗口置顶"), QSize(46, 42));
@@ -62,8 +69,8 @@ TitleBar::TitleBar(IconManager *iconManager, QWidget *parent)
     layout->addWidget(m_appIcon);
     layout->addSpacing(5);
     layout->addWidget(name);
-    layout->addSpacing(12);
-    layout->addWidget(m_pageTitle);
+    layout->addSpacing(6);
+    layout->addWidget(m_connectionButton);
     layout->addStretch();
     layout->addWidget(m_pinButton);
     layout->addWidget(m_themeButton);
@@ -83,9 +90,19 @@ void TitleBar::setMaximized(const bool maximized)
     refreshIcons();
 }
 
-void TitleBar::setCurrentPageTitle(const QString &title)
+void TitleBar::setConnectionState(const ConnectionState state)
 {
-    m_pageTitle->setText(title);
+    const bool active = state == ConnectionState::Connecting
+        || state == ConnectionState::Connected
+        || state == ConnectionState::Disconnecting;
+    m_connectionButton->setChecked(active);
+    m_connectionButton->setEnabled(
+        state != ConnectionState::Disconnecting);
+    m_connectionButton->setToolTip(
+        state == ConnectionState::Connecting ? tr("取消连接")
+        : state == ConnectionState::Connected ? tr("断开设备")
+        : state == ConnectionState::Disconnecting ? tr("正在断开")
+        : tr("连接设备"));
 }
 
 QPoint TitleBar::themeButtonCenter(QWidget *target) const
@@ -106,6 +123,8 @@ void TitleBar::mouseDoubleClickEvent(QMouseEvent *event)
 void TitleBar::refreshIcons()
 {
     m_menuButton->setIcon(m_iconManager->icon(QStringLiteral(":/icons/titlebar/menu.svg")));
+    m_connectionButton->setIcon(m_iconManager->icon(
+        QStringLiteral(":/icons/navigation/connection.svg")));
     m_pinButton->setIcon(m_pinned
         ? m_iconManager->rotatedIcon(QStringLiteral(":/icons/titlebar/pin.svg"), 90.0)
         : m_iconManager->icon(QStringLiteral(":/icons/titlebar/pin.svg")));

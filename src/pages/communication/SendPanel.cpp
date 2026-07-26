@@ -16,7 +16,6 @@
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QScrollArea>
-#include <QSignalBlocker>
 #include <QStackedWidget>
 #include <QStyle>
 #include <QToolButton>
@@ -190,21 +189,10 @@ QWidget *SendPanel::createCustomBinaryPage()
     root->setContentsMargins(2, 2, 2, 2);
     root->setSpacing(6);
 
-    auto *header = new QHBoxLayout;
-    header->setSpacing(8);
-    auto *commandLabel = new QLabel(tr("发送命令"), page);
-    commandLabel->setProperty("muted", true);
-    header->addWidget(commandLabel);
-    m_commandCombo = new QComboBox(page);
-    m_commandCombo->setObjectName(QStringLiteral("customCommandCombo"));
-    m_commandCombo->setMinimumWidth(220);
-    header->addWidget(m_commandCombo);
-    new FocusUnderline(m_commandCombo, m_context->themeManager());
     m_customStatus = new QLabel(page);
     m_customStatus->setObjectName(QStringLiteral("customSendStatus"));
     m_customStatus->setProperty("muted", true);
-    header->addWidget(m_customStatus, 1);
-    root->addLayout(header);
+    root->addWidget(m_customStatus);
 
     m_fieldScroll = new QScrollArea(page);
     m_fieldScroll->setObjectName(QStringLiteral("customFieldScroll"));
@@ -235,12 +223,6 @@ QWidget *SendPanel::createCustomBinaryPage()
     footer->addWidget(m_customSendButton);
     root->addLayout(footer);
 
-    connect(m_commandCombo, &QComboBox::currentIndexChanged, this, [this] {
-        saveCustomDrafts();
-        m_currentCommandId = m_commandCombo->currentData().toString();
-        m_context->settings()->setCustomCommandId(m_currentCommandId);
-        rebuildDynamicFields();
-    });
     connect(m_previewButton, &QPushButton::clicked,
             this, &SendPanel::previewCustomPayload);
     connect(m_customSendButton, &QPushButton::clicked,
@@ -285,6 +267,15 @@ void SendPanel::setCurrentProtocolId(const QString &protocolId)
     saveCustomDrafts();
     m_currentProtocolId = protocolId;
     populateCommands();
+}
+
+void SendPanel::setCurrentCommandId(const QString &commandId)
+{
+    if (m_currentCommandId == commandId) return;
+    saveCustomDrafts();
+    m_currentCommandId = commandId;
+    m_context->settings()->setCustomCommandId(commandId);
+    rebuildDynamicFields();
 }
 
 void SendPanel::setEncoder(
@@ -389,26 +380,28 @@ void SendPanel::previewCustomPayload()
 
 void SendPanel::populateCommands()
 {
-    const QSignalBlocker blocker(m_commandCombo);
-    m_commandCombo->clear();
     const ProtocolDefinition *protocol = currentProtocol();
     if (!protocol) {
-        m_commandCombo->addItem(tr("请先选择自定义协议"), QString());
-        m_commandCombo->setEnabled(false);
         m_currentCommandId.clear();
         rebuildDynamicFields();
         return;
     }
-    for (const MessageDefinition &message : protocol->sendMessages) {
-        const QString name = message.displayName.trimmed().isEmpty()
-            ? message.id : message.displayName;
-        m_commandCombo->addItem(name, message.id);
+    QString selected = m_currentCommandId;
+    if (selected.isEmpty()) {
+        selected = m_context->settings()->customCommandId();
     }
-    m_commandCombo->setEnabled(!protocol->sendMessages.isEmpty());
-    const int savedIndex = m_commandCombo->findData(
-        m_context->settings()->customCommandId());
-    if (savedIndex >= 0) m_commandCombo->setCurrentIndex(savedIndex);
-    m_currentCommandId = m_commandCombo->currentData().toString();
+    const auto iterator = std::ranges::find_if(
+        protocol->sendMessages,
+        [&selected](const MessageDefinition &message) {
+            return message.id == selected;
+        });
+    m_currentCommandId = iterator != protocol->sendMessages.end()
+        ? iterator->id
+        : protocol->sendMessages.isEmpty()
+            ? QString{}
+            : protocol->sendMessages.constFirst().id;
+    m_context->settings()->setCustomCommandId(
+        m_currentCommandId);
     rebuildDynamicFields();
 }
 
@@ -549,7 +542,7 @@ QWidget *SendPanel::createFieldEditor(
 
 void SendPanel::saveCustomDrafts()
 {
-    if (!m_commandCombo || m_fieldEditors.isEmpty()) return;
+    if (m_fieldEditors.isEmpty()) return;
     QVariantMap drafts = m_context->settings()->customFieldDrafts();
     for (const FieldEditor &entry : std::as_const(m_fieldEditors)) {
         QVariant value;
@@ -846,7 +839,7 @@ const ProtocolDefinition *SendPanel::currentProtocol() const
 const MessageDefinition *SendPanel::currentMessage() const
 {
     const ProtocolDefinition *protocol = currentProtocol();
-    if (!protocol || !m_commandCombo) return nullptr;
+    if (!protocol) return nullptr;
     for (const MessageDefinition &message : protocol->sendMessages) {
         if (message.id == m_currentCommandId) return &message;
     }

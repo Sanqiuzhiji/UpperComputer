@@ -48,6 +48,8 @@ int main(int argc, char *argv[])
         settings.setCustomCommandId(QStringLiteral("command-id"));
         settings.setCustomFieldDrafts(
             {{QStringLiteral("protocol/command/field"), 42}});
+        settings.setWorkspaceDirectory(
+            settingsDirectory.filePath(QStringLiteral("workspaces")));
     }
     {
         AppSettings settings;
@@ -80,6 +82,10 @@ int main(int argc, char *argv[])
             || settings.customFieldDrafts().value(
                    QStringLiteral("protocol/command/field")).toInt() != 42) {
             return 11;
+        }
+        if (settings.workspaceDirectory()
+            != settingsDirectory.filePath(QStringLiteral("workspaces"))) {
+            return 12;
         }
     }
     return 0;

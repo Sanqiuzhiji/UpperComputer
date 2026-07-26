@@ -54,13 +54,13 @@ private:
     QStackedWidget *m_stack{};
 
     QLineEdit *m_documentName{};
-    QLineEdit *m_documentId{};
     QLabel *m_documentFrameCount{};
     QLabel *m_documentByteCount{};
     QLabel *m_documentErrors{};
 
     QLineEdit *m_frameName{};
     QLineEdit *m_frameId{};
+    QComboBox *m_frameDirection{};
     QLabel *m_frameFieldCount{};
     QLabel *m_frameByteCount{};
     QLabel *m_frameErrors{};

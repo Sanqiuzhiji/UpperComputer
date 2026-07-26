@@ -2,6 +2,8 @@
 
 #include <QWidget>
 
+#include "models/AppTypes.h"
+
 class IconManager;
 class QLabel;
 class QToolButton;
@@ -13,11 +15,12 @@ class TitleBar final : public QWidget
 public:
     explicit TitleBar(IconManager *iconManager, QWidget *parent = nullptr);
     void setMaximized(bool maximized);
-    void setCurrentPageTitle(const QString &title);
+    void setConnectionState(ConnectionState state);
     [[nodiscard]] QPoint themeButtonCenter(QWidget *target) const;
 
 signals:
     void navigationToggleRequested();
+    void connectionToggleRequested();
     void pinToggleRequested(bool pinned);
     void themeToggleRequested();
     void minimizeRequested();
@@ -36,8 +39,8 @@ private:
 
     IconManager *m_iconManager;
     QLabel *m_appIcon{};
-    QLabel *m_pageTitle{};
     QToolButton *m_menuButton{};
+    QToolButton *m_connectionButton{};
     QToolButton *m_pinButton{};
     QToolButton *m_themeButton{};
     QToolButton *m_minimizeButton{};

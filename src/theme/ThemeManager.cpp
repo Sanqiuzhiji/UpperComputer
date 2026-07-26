@@ -79,6 +79,9 @@ QString ThemeManager::styleSheet() const
         QPushButton:pressed, QToolButton:pressed { background: %5; }
         QPushButton[accent="true"] { background: #28A9E0; color: white; }
         QPushButton[accent="true"]:hover { background: #43B7E7; }
+        QToolButton[connectionQuick="true"]:checked {
+            color: #28A9E0; background: %7; border-color: %5;
+        }
         QPushButton[nav="true"] { text-align: left; padding: 9px 10px; border-radius: 5px; }
         QPushButton[nav="true"]:checked {
             background: %7; color: #28A9E0;

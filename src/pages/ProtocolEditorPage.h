@@ -66,7 +66,8 @@ private:
     void switchProtocol(int comboIndex);
     void rescanProtocols();
     void importProtocol();
-    void deleteSelection();
+    void deleteCurrentWorkspace();
+    void resetDeleteWorkspaceConfirmation();
     void deleteFrame(const QUuid &frameId);
     void deleteField(
         const QUuid &frameId, const QUuid &fieldId);
@@ -120,7 +121,7 @@ private:
     QAction *m_redoAction{};
     QAction *m_copyAction{};
     QAction *m_pasteAction{};
-    QAction *m_deleteAction{};
+    QAction *m_deleteWorkspaceAction{};
     QAction *m_importAction{};
     QAction *m_saveAction{};
     QAction *m_saveAsAction{};
@@ -132,6 +133,8 @@ private:
     bool m_temporary{true};
     bool m_forceDirty{true};
     bool m_refreshingCombo{};
+    bool m_deleteWorkspaceArmed{};
+    quint64 m_deleteWorkspaceConfirmationToken{};
     int m_untitledCounter{};
     QUuid m_selectedFrameId;
     QUuid m_selectedFieldId;

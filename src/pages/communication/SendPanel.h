@@ -31,6 +31,7 @@ public:
 
     void setProtocols(const QList<ProtocolDefinition> &protocols);
     void setCurrentProtocolId(const QString &protocolId);
+    void setCurrentCommandId(const QString &commandId);
     void setEncoder(
         const QString &protocolId,
         std::shared_ptr<const CustomBinaryEncoder> encoder);
@@ -94,7 +95,6 @@ private:
     QComboBox *m_lineEndingCombo{};
     QPushButton *m_rawSendButton{};
 
-    QComboBox *m_commandCombo{};
     QScrollArea *m_fieldScroll{};
     QWidget *m_fieldContainer{};
     QVBoxLayout *m_fieldLayout{};

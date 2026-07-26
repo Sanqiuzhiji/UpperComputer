@@ -6,8 +6,13 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDir>
+#include <QFileDialog>
 #include <QFrame>
+#include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
+#include <QPushButton>
 #include <QScrollArea>
 #include <QVBoxLayout>
 
@@ -55,6 +60,41 @@ SettingsPage::SettingsPage(AppContext *context, QWidget *parent)
     contentLayout->addWidget(createSettingCard(
         tr("用户信息卡片"), tr("在导航栏顶部显示软件信息。"), userCard));
     connect(userCard, &QCheckBox::toggled, this, &SettingsPage::userCardVisibilityChanged);
+
+    auto *workspacePathControl = new QWidget(this);
+    auto *workspacePathLayout = new QHBoxLayout(workspacePathControl);
+    workspacePathLayout->setContentsMargins(0, 0, 0, 0);
+    workspacePathLayout->setSpacing(8);
+    auto *workspacePath = new QLineEdit(
+        m_settings->workspaceDirectory(), workspacePathControl);
+    workspacePath->setObjectName(QStringLiteral("workspaceDirectoryEditor"));
+    workspacePath->setMinimumWidth(300);
+    auto *browseWorkspacePath =
+        new QPushButton(tr("浏览…"), workspacePathControl);
+    browseWorkspacePath->setObjectName(
+        QStringLiteral("workspaceDirectoryBrowseButton"));
+    workspacePathLayout->addWidget(workspacePath, 1);
+    workspacePathLayout->addWidget(browseWorkspacePath);
+    contentLayout->addWidget(createSettingCard(
+        tr("工作空间保存路径"),
+        tr("新建工作空间默认保存在这里；默认是工程目录下的 workspaces 文件夹。"),
+        workspacePathControl));
+    const auto applyWorkspacePath = [this, workspacePath] {
+        m_settings->setWorkspaceDirectory(workspacePath->text());
+        workspacePath->setText(m_settings->workspaceDirectory());
+    };
+    connect(workspacePath, &QLineEdit::editingFinished,
+            this, applyWorkspacePath);
+    connect(browseWorkspacePath, &QPushButton::clicked, this,
+            [this, workspacePath] {
+                const QString selected = QFileDialog::getExistingDirectory(
+                    this, tr("选择工作空间保存路径"),
+                    workspacePath->text());
+                if (selected.isEmpty()) return;
+                workspacePath->setText(QDir::toNativeSeparators(selected));
+                m_settings->setWorkspaceDirectory(selected);
+                workspacePath->setText(m_settings->workspaceDirectory());
+            });
 
     auto *renderMode = createOptions({tr("原生"), tr("光栅"), tr("OpenGL")});
     contentLayout->addWidget(createSettingCard(

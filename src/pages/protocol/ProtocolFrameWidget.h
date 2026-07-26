@@ -47,12 +47,14 @@ signals:
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dragMoveEvent(QDragMoveEvent *event) override;
     void dragLeaveEvent(QDragLeaveEvent *event) override;
     void dropEvent(QDropEvent *event) override;
 
 private:
+    void startFrameDrag(const QPoint &hotSpot);
     [[nodiscard]] int insertionIndex(int localX) const;
     void showInsertionLine(int index);
     void hideInsertionLine();
@@ -62,4 +64,6 @@ private:
     QHBoxLayout *m_fieldsLayout{};
     QFrame *m_insertionLine{};
     QList<ProtocolFieldCard *> m_cards;
+    QPoint m_frameDragStart;
+    bool m_frameDragArmed{false};
 };

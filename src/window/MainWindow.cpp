@@ -61,6 +61,8 @@ MainWindow::MainWindow(AppContext *context, QWidget *parent)
 
     connect(m_titleBar, &TitleBar::navigationToggleRequested,
             m_navigation, &SideNavigation::toggleExpanded);
+    connect(m_titleBar, &TitleBar::connectionToggleRequested,
+            this, &MainWindow::toggleDeviceConnection);
     connect(m_titleBar, &TitleBar::themeToggleRequested,
             this, &MainWindow::toggleThemeWithTransition);
     connect(m_titleBar, &TitleBar::minimizeRequested, this, &QWidget::showMinimized);
@@ -197,7 +199,6 @@ void MainWindow::switchPage(const PageId page)
     m_pages->setCurrentWidget(pageWidget);
     m_navigation->setCurrentPage(page);
     m_statusBar->setCurrentPageTitle(descriptor->title);
-    m_titleBar->setCurrentPageTitle(descriptor->title);
     m_settings->setLastPage(page);
 }
 
@@ -436,6 +437,8 @@ void MainWindow::bindConnectionStatus()
     ConnectionManager *connection = m_context->connectionManager();
     connect(connection, &ConnectionManager::stateChanged,
             m_statusBar, &StatusBarWidget::setConnectionState);
+    connect(connection, &ConnectionManager::stateChanged,
+            m_titleBar, &TitleBar::setConnectionState);
     connect(connection, &ConnectionManager::deviceNameChanged,
             m_statusBar, &StatusBarWidget::setDeviceName);
     connect(connection, &ConnectionManager::dataSourceNameChanged,
@@ -450,12 +453,68 @@ void MainWindow::bindConnectionStatus()
             m_statusBar, &StatusBarWidget::setTransmitTotal);
 
     m_statusBar->setConnectionState(connection->state());
+    m_titleBar->setConnectionState(connection->state());
     m_statusBar->setDeviceName(connection->deviceName());
     m_statusBar->setDataSourceName(connection->dataSourceName());
     m_statusBar->setReceiveRate(connection->receiveRate());
     m_statusBar->setTransmitRate(connection->transmitRate());
     m_statusBar->setReceiveTotal(connection->receiveTotal());
     m_statusBar->setTransmitTotal(connection->transmitTotal());
+}
+
+void MainWindow::toggleDeviceConnection()
+{
+    ConnectionManager *connection = m_context->connectionManager();
+    switch (connection->state()) {
+    case ConnectionState::Connecting:
+    case ConnectionState::Connected:
+        connection->disconnectTransport();
+        return;
+    case ConnectionState::Disconnecting:
+        return;
+    case ConnectionState::Disconnected:
+    case ConnectionState::Error:
+        break;
+    }
+
+    const TransportType type = m_settings->transportType();
+    const TransportConfig config = savedTransportConfig();
+    if (type == TransportType::SerialPort
+        && std::get<SerialConfig>(config).portName.trimmed().isEmpty()) {
+        m_titleBar->setConnectionState(connection->state());
+        switchPage(PageId::Communication);
+        showNotice(
+            tr("请先选择串口设备"),
+            ToastWidget::Type::Warning);
+        return;
+    }
+    if (type == TransportType::TcpClient
+        && std::get<TcpClientConfig>(config).host.trimmed().isEmpty()) {
+        m_titleBar->setConnectionState(connection->state());
+        switchPage(PageId::Communication);
+        showNotice(
+            tr("请先填写 TCP 服务端地址"),
+            ToastWidget::Type::Warning);
+        return;
+    }
+    connection->connectTransport(type, config);
+}
+
+TransportConfig MainWindow::savedTransportConfig() const
+{
+    switch (m_settings->transportType()) {
+    case TransportType::SerialPort:
+        return m_settings->serialConfig();
+    case TransportType::Udp:
+        return m_settings->udpConfig();
+    case TransportType::TcpServer:
+        return m_settings->tcpServerConfig();
+    case TransportType::TcpClient:
+        return m_settings->tcpClientConfig();
+    case TransportType::VirtualData:
+        return m_settings->virtualDataConfig();
+    }
+    return m_settings->serialConfig();
 }
 
 void MainWindow::updateWindowStateUi()

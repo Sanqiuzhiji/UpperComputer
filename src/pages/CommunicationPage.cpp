@@ -12,6 +12,8 @@
 #include <QSplitter>
 #include <QVBoxLayout>
 
+#include <algorithm>
+
 CommunicationPage::CommunicationPage(
     AppContext *context, QWidget *parent)
     : QWidget(parent),
@@ -140,6 +142,13 @@ CommunicationPage::CommunicationPage(
                 installCustomBinaryParser(protocolId);
                 emit customProtocolChanged(protocolId);
             });
+    connect(m_modePanel, &CommunicationModePanel::receiveCommandChanged,
+            this, [this](const QString &) {
+                installCustomBinaryParser(
+                    m_modePanel->currentProtocolId());
+            });
+    connect(m_modePanel, &CommunicationModePanel::sendCommandChanged,
+            m_sendPanel, &SendPanel::setCurrentCommandId);
     connect(m_modePanel, &CommunicationModePanel::requestProtocolLibrary,
             this, &CommunicationPage::requestProtocolLibrary);
 }
@@ -157,6 +166,8 @@ void CommunicationPage::setProtocols(
         m_sendPanel->setEncoder(protocol.id, codec);
     }
     m_sendPanel->setCurrentProtocolId(m_modePanel->currentProtocolId());
+    m_sendPanel->setCurrentCommandId(
+        m_modePanel->currentSendCommandId());
     installCustomBinaryParser(m_modePanel->currentProtocolId());
 }
 
@@ -179,9 +190,22 @@ void CommunicationPage::installCustomBinaryParser(
 {
     for (const ProtocolDefinition &protocol : m_protocols) {
         if (protocol.id != protocolId) continue;
+        ProtocolDefinition selected = protocol;
+        const QString receiveCommandId =
+            m_modePanel->currentReceiveCommandId();
+        selected.receiveMessages.erase(
+            std::remove_if(
+                selected.receiveMessages.begin(),
+                selected.receiveMessages.end(),
+                [&receiveCommandId](
+                    const MessageDefinition &message) {
+                    return message.id != receiveCommandId;
+                }),
+            selected.receiveMessages.end());
         m_monitorPanel->setParser(
             ParserMode::CustomBinary,
-            std::make_shared<CustomBinaryCodec>(protocol));
+            std::make_shared<CustomBinaryCodec>(
+                std::move(selected)));
         return;
     }
     m_monitorPanel->setParser(

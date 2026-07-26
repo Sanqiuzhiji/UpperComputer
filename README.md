@@ -1,1 +1,1 @@
-# UpperComputer£¨ÉÏÎ»»ú£©
+# UpperComputer

@@ -47,6 +47,19 @@ QString uniqueDefaultName(const FieldRole role)
     return QStringLiteral("data");
 }
 
+QString frameDirectionKey(const FrameDirection direction)
+{
+    switch (direction) {
+    case FrameDirection::Bidirectional:
+        return QStringLiteral("bidirectional");
+    case FrameDirection::TransmitOnly:
+        return QStringLiteral("transmitOnly");
+    case FrameDirection::ReceiveOnly:
+        return QStringLiteral("receiveOnly");
+    }
+    return QStringLiteral("bidirectional");
+}
+
 QJsonObject fieldToJson(const Field &field)
 {
     QJsonObject object;
@@ -332,6 +345,9 @@ QJsonObject toJson(const Document &document)
         QJsonObject frameObject;
         frameObject.insert(QStringLiteral("id"), uuidText(frame.id));
         frameObject.insert(QStringLiteral("name"), frame.name);
+        frameObject.insert(
+            QStringLiteral("direction"),
+            frameDirectionKey(frame.direction));
         QJsonArray fields;
         for (const Field &field : frame.fields) {
             fields.append(fieldToJson(field));
@@ -382,6 +398,17 @@ bool fromJson(
         frame.id = readUuid(frameObject, "id");
         if (frame.id.isNull()) frame.id = QUuid::createUuid();
         frame.name = frameObject.value(QStringLiteral("name")).toString();
+        frame.direction = enumFromKey<FrameDirection>(
+            frameObject.value(QStringLiteral("direction")).toString(),
+            {
+                {QStringLiteral("bidirectional"),
+                 FrameDirection::Bidirectional},
+                {QStringLiteral("transmitOnly"),
+                 FrameDirection::TransmitOnly},
+                {QStringLiteral("receiveOnly"),
+                 FrameDirection::ReceiveOnly}
+            },
+            FrameDirection::Bidirectional);
         const QJsonValue fieldsValue = frameObject.value(QStringLiteral("fields"));
         if (!fieldsValue.isArray()) {
             if (errorMessage) {

@@ -100,7 +100,6 @@ void ProtocolPropertyPanel::showDocument(
     m_updating = true;
     m_stack->setCurrentIndex(0);
     m_documentName->setText(document.name);
-    m_documentId->setText(uuidText(document.id));
     m_documentFrameCount->setText(QString::number(document.frames.size()));
     m_documentByteCount->setText(
         QStringLiteral("%1 B").arg(documentByteCount(document)));
@@ -122,6 +121,9 @@ void ProtocolPropertyPanel::showFrame(
     m_stack->setCurrentIndex(1);
     m_frameName->setText(frame.name);
     m_frameId->setText(uuidText(frame.id));
+    m_frameDirection->setCurrentIndex(
+        m_frameDirection->findData(
+            QVariant::fromValue(frame.direction)));
     m_frameFieldCount->setText(QString::number(frame.fields.size()));
     m_frameByteCount->setText(
         QStringLiteral("%1 B").arg(frameByteCount(frame)));
@@ -186,9 +188,6 @@ QWidget *ProtocolPropertyPanel::createDocumentPage()
     m_documentName = new QLineEdit(page);
     m_documentName->setObjectName(QStringLiteral("protocolNameEditor"));
     form->addRow(QStringLiteral("协议名称"), m_documentName);
-    m_documentId = new QLineEdit(page);
-    m_documentId->setReadOnly(true);
-    form->addRow(QStringLiteral("文档 ID"), m_documentId);
     m_documentFrameCount = new QLabel(page);
     form->addRow(QStringLiteral("协议帧数量"), m_documentFrameCount);
     m_documentByteCount = new QLabel(page);
@@ -216,6 +215,19 @@ QWidget *ProtocolPropertyPanel::createFramePage()
     m_frameId = new QLineEdit(page);
     m_frameId->setReadOnly(true);
     form->addRow(QStringLiteral("协议帧 ID"), m_frameId);
+    m_frameDirection = new QComboBox(page);
+    m_frameDirection->setObjectName(
+        QStringLiteral("protocolFrameDirectionEditor"));
+    addEnumItem(
+        m_frameDirection, QStringLiteral("双向"),
+        FrameDirection::Bidirectional);
+    addEnumItem(
+        m_frameDirection, QStringLiteral("仅发送 (Tx)"),
+        FrameDirection::TransmitOnly);
+    addEnumItem(
+        m_frameDirection, QStringLiteral("仅接收 (Rx)"),
+        FrameDirection::ReceiveOnly);
+    form->addRow(QStringLiteral("通信方向"), m_frameDirection);
     m_frameFieldCount = new QLabel(page);
     form->addRow(QStringLiteral("字段数量"), m_frameFieldCount);
     m_frameByteCount = new QLabel(page);
@@ -319,6 +331,8 @@ void ProtocolPropertyPanel::connectEditors()
     });
     connect(m_frameName, &QLineEdit::editingFinished,
             this, &ProtocolPropertyPanel::submitFrame);
+    connect(m_frameDirection, &QComboBox::currentIndexChanged,
+            this, &ProtocolPropertyPanel::submitFrame);
     connect(m_fieldName, &QLineEdit::editingFinished,
             this, &ProtocolPropertyPanel::submitField);
     connect(m_byteCount, &QSpinBox::editingFinished,
@@ -373,6 +387,8 @@ void ProtocolPropertyPanel::submitFrame()
     if (m_updating) return;
     Frame updated = m_currentFrame;
     updated.name = m_frameName->text();
+    updated.direction =
+        m_frameDirection->currentData().value<FrameDirection>();
     if (updated == m_currentFrame) return;
     m_currentFrame = updated;
     emit frameEdited(updated);

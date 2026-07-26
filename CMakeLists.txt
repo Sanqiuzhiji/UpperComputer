@@ -8,6 +8,8 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+add_compile_definitions(
+    UPPERCOMPUTER_PROJECT_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
 # Configure Qt6_DIR or CMAKE_PREFIX_PATH in the CLion CMake profile/toolchain.
 find_package(Qt6 6.11 REQUIRED COMPONENTS

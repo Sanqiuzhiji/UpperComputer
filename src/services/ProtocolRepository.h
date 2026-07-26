@@ -26,6 +26,7 @@ public:
         QObject *parent = nullptr, const QString &directoryPath = {});
 
     [[nodiscard]] QString directoryPath() const;
+    void setDirectoryPath(const QString &directoryPath);
     [[nodiscard]] QList<ProtocolSummary> availableProtocols() const;
     [[nodiscard]] std::optional<ProtocolModel::Document> protocolById(
         const QString &id) const;
@@ -39,6 +40,10 @@ public:
         QString *savedPath = nullptr,
         QString *errorMessage = nullptr);
     bool remove(const QString &id, QString *errorMessage = nullptr);
+    bool openFile(
+        const QString &filePath,
+        ProtocolModel::Document *document,
+        QString *errorMessage = nullptr);
     bool importFile(
         const QString &sourcePath,
         QString *importedId = nullptr,

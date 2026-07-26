@@ -1,6 +1,7 @@
 # CMake / IDE build output
 /cmake-build-*/
 /.codex-diagnostic-build*/
+/workspaces/
 /build/
 /out/
 
@@ -15,6 +16,10 @@ compile_commands.json
 
 # CLion local settings
 /.idea/
+
+# Local agent tooling
+/.agents/
+/.codex/
 
 # MSVC artifacts
 *.obj

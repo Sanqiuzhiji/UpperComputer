@@ -12,13 +12,16 @@ AppContext::AppContext(QObject *parent)
       m_connectionManager(new ConnectionManager(this)),
       m_themeManager(new ThemeManager(m_settings, this)),
       m_iconManager(new IconManager(m_themeManager, this)),
-      m_protocolRepository(new ProtocolRepository(this))
+      m_protocolRepository(new ProtocolRepository(
+          this, m_settings->workspaceDirectory()))
 {
     connect(m_protocolRepository,
             &ProtocolRepository::notificationRequested,
             this, &AppContext::notify,
             Qt::QueuedConnection);
     m_protocolRepository->rescan();
+    connect(m_settings, &AppSettings::workspaceDirectoryChanged,
+            m_protocolRepository, &ProtocolRepository::setDirectoryPath);
 }
 
 AppSettings *AppContext::settings() const noexcept

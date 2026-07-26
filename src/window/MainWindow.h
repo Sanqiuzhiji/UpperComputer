@@ -5,6 +5,7 @@
 #include <QList>
 
 #include "models/AppTypes.h"
+#include "models/ConnectionTypes.h"
 #include "widgets/ToastWidget.h"
 
 enum class PageId;
@@ -50,6 +51,8 @@ private:
     [[nodiscard]] QWidget *ensurePage(PageId id);
     void configurePage(PageId id, QWidget *page);
     void bindConnectionStatus();
+    void toggleDeviceConnection();
+    [[nodiscard]] TransportConfig savedTransportConfig() const;
     void updateWindowStateUi();
     void restoreWindowSettings();
     void cancelThemeTransition();

@@ -60,6 +60,13 @@ ProtocolFieldType communicationType(const DataType type)
     return ::ProtocolChecksumAlgorithm::Sum8;
 }
 
+bool sameWorkspace(const Document &left, const Document &right)
+{
+    Document normalizedLeft = left;
+    normalizedLeft.id = right.id;
+    return normalizedLeft == right;
+}
+
 } // namespace
 
 ProtocolRepository::ProtocolRepository(
@@ -78,17 +85,44 @@ QString ProtocolRepository::directoryPath() const
     return m_directoryPath;
 }
 
+void ProtocolRepository::setDirectoryPath(const QString &directoryPath)
+{
+    const QString normalized = QDir::cleanPath(directoryPath.trimmed());
+    if (normalized.isEmpty() || normalized == m_directoryPath) return;
+    m_directoryPath = normalized;
+    m_records.clear();
+    rescan();
+}
+
 QList<ProtocolSummary> ProtocolRepository::availableProtocols() const
 {
     QList<ProtocolSummary> summaries;
+    QHash<QString, int> displayNameCounts;
     summaries.reserve(m_records.size());
     for (auto iterator = m_records.cbegin(); iterator != m_records.cend();
          ++iterator) {
+        const QString displayName = iterator->document.name.trimmed();
         summaries.append({
             iterator.key(),
-            iterator->document.name,
+            displayName,
             iterator->filePath
         });
+        ++displayNameCounts[displayName.toCaseFolded()];
+    }
+    for (ProtocolSummary &summary : summaries) {
+        if (displayNameCounts.value(
+                summary.displayName.toCaseFolded()) < 2) {
+            continue;
+        }
+        QString fileName = QFileInfo(summary.filePath).fileName();
+        constexpr auto protocolSuffix = ".ucproto.json";
+        if (fileName.endsWith(
+                QLatin1String(protocolSuffix), Qt::CaseInsensitive)) {
+            fileName.chop(
+                static_cast<int>(QLatin1String(protocolSuffix).size()));
+        }
+        summary.displayName =
+            QStringLiteral("%1 — %2").arg(summary.displayName, fileName);
     }
     std::ranges::sort(
         summaries, [](const ProtocolSummary &left,
@@ -162,8 +196,12 @@ QList<ProtocolDefinition> ProtocolRepository::communicationDefinitions() const
                 }
                 message.fields.append(target);
             }
-            definition.receiveMessages.append(message);
-            definition.sendMessages.append(message);
+            if (frame.direction != FrameDirection::TransmitOnly) {
+                definition.receiveMessages.append(message);
+            }
+            if (frame.direction != FrameDirection::ReceiveOnly) {
+                definition.sendMessages.append(message);
+            }
         }
         definitions.append(definition);
     }
@@ -204,6 +242,15 @@ bool ProtocolRepository::rescan(QStringList *errors)
             emit notificationRequested(message, NotificationType::Warning);
             continue;
         }
+        bool duplicateWorkspace = false;
+        for (auto iterator = scanned.cbegin();
+             iterator != scanned.cend(); ++iterator) {
+            if (sameWorkspace(iterator->document, document)) {
+                duplicateWorkspace = true;
+                break;
+            }
+        }
+        if (duplicateWorkspace) continue;
         scanned.insert(id, {document, fileInfo.absoluteFilePath()});
     }
     m_records = std::move(scanned);
@@ -225,16 +272,28 @@ bool ProtocolRepository::save(
         }
     }
     QString path = targetPath;
+    bool generatedPath = false;
     if (path.trimmed().isEmpty()) {
         path = filePathForId(normalizedId(document.id));
     }
     if (path.trimmed().isEmpty()) {
+        generatedPath = true;
         path = QDir(m_directoryPath).filePath(
             safeFileName(document.name) + QStringLiteral(".ucproto.json"));
     }
     if (!path.endsWith(QStringLiteral(".ucproto.json"),
                        Qt::CaseInsensitive)) {
         path += QStringLiteral(".ucproto.json");
+    }
+    if (generatedPath && QFileInfo::exists(path)) {
+        const QString basePath = path.left(
+            path.size() - QStringLiteral(".ucproto.json").size());
+        int suffix = 2;
+        do {
+            path = QStringLiteral("%1_%2.ucproto.json")
+                       .arg(basePath)
+                       .arg(suffix++);
+        } while (QFileInfo::exists(path));
     }
     const QFileInfo fileInfo(path);
     if (!QDir().mkpath(fileInfo.absolutePath())) {
@@ -285,6 +344,23 @@ bool ProtocolRepository::remove(
     return true;
 }
 
+bool ProtocolRepository::openFile(
+    const QString &filePath,
+    Document *document,
+    QString *errorMessage)
+{
+    Document loaded;
+    if (!loadFile(filePath, &loaded, errorMessage)) return false;
+    const QString absolutePath = QFileInfo(filePath).absoluteFilePath();
+    upsertRecord(loaded, absolutePath);
+    if (document) *document = loaded;
+    emit protocolLibraryChanged();
+    emit notificationRequested(
+        tr("工作空间“%1”已打开").arg(loaded.name),
+        NotificationType::Success);
+    return true;
+}
+
 bool ProtocolRepository::importFile(
     const QString &sourcePath,
     QString *importedId,
@@ -292,6 +368,16 @@ bool ProtocolRepository::importFile(
 {
     Document document;
     if (!loadFile(sourcePath, &document, errorMessage)) return false;
+
+    for (auto iterator = m_records.cbegin();
+         iterator != m_records.cend(); ++iterator) {
+        if (!sameWorkspace(iterator->document, document)) continue;
+        if (importedId) *importedId = iterator.key();
+        emit notificationRequested(
+            tr("该工作空间已经存在"),
+            NotificationType::Information);
+        return true;
+    }
 
     QString id = normalizedId(document.id);
     if (m_records.contains(id)) {

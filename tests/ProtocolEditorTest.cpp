@@ -1,9 +1,11 @@
 #include <QAction>
 #include <QApplication>
 #include <QFile>
+#include <QJsonDocument>
 #include <QKeySequence>
 #include <QLineEdit>
 #include <QMouseEvent>
+#include <QSet>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QToolButton>
@@ -115,6 +117,33 @@ void testRepository()
     verify(
         reloaded.availableProtocols().size() == 1,
         "healthy protocol remains available");
+
+    const QString importSource =
+        temporary.filePath(QStringLiteral("same-name-source.json"));
+    QFile importFile(importSource);
+    verify(
+        importFile.open(QIODevice::WriteOnly | QIODevice::Text),
+        "same-name import source can be created");
+    importFile.write(
+        QJsonDocument(toJson(document)).toJson(QJsonDocument::Indented));
+    importFile.close();
+    QString firstImportedId;
+    QString secondImportedId;
+    verify(
+        reloaded.importFile(importSource, &firstImportedId, &error),
+        "same-name protocol can be imported once");
+    verify(
+        reloaded.importFile(importSource, &secondImportedId, &error),
+        "same-name protocol can be imported twice");
+    const QList<ProtocolSummary> imported = reloaded.availableProtocols();
+    QSet<QString> importedLabels;
+    for (const ProtocolSummary &summary : imported) {
+        importedLabels.insert(summary.displayName);
+    }
+    verify(
+        imported.size() == 3
+            && importedLabels.size() == imported.size(),
+        "same-name imports have distinct protocol picker labels");
 }
 
 void testPage()
@@ -181,8 +210,13 @@ void testPage()
     QWidget *frameWidget = page.findChild<QWidget *>(
         QStringLiteral("protocolFrameWidget"));
     verify(
-        frameWidget != nullptr && frameWidget->minimumHeight() <= 64,
-        "protocol rows use the compact height");
+        frameWidget != nullptr
+            && frameWidget->height() == 120
+            && frameWidget->minimumHeight() == 120
+            && frameWidget->maximumHeight() == 120
+            && frameWidget->sizePolicy().verticalPolicy()
+                == QSizePolicy::Fixed,
+        "protocol rows use the fixed compact height");
 
     QWidget *fieldCard = page.findChild<QWidget *>(
         QStringLiteral("protocolFieldCard"));
@@ -281,6 +315,14 @@ void testPage()
         }
     }
     verify(firstFrameWidget != nullptr, "frame drop target exists");
+    if (firstFrameWidget) {
+        auto *dragHandle = firstFrameWidget->findChild<QToolButton *>(
+            QStringLiteral("protocolFrameDragHandle"));
+        verify(
+            dragHandle != nullptr
+                && dragHandle->cursor().shape() == Qt::OpenHandCursor,
+            "frame row exposes its drag handle");
+    }
     verify(
         firstFrameWidget
             && QMetaObject::invokeMethod(
