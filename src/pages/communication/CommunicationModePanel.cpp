@@ -190,9 +190,8 @@ QString CommunicationModePanel::helpText() const
         return tr("FireWater 解析入口已经预留，但当前仓库没有经过确认的"
                   "解析器实现，因此不会猜测协议算法。");
     case ParserMode::CustomBinary:
-        return tr("CustomBinary 使用共享协议选择。协议库与解析器尚未接入时，"
-                  "监视区会显示明确的空状态。");
+        return tr("CustomBinary 使用共享协议选择，按协议中的帧头、长度、"
+                  "字段类型、字节序和校验规则自动拆帧并显示字段值。");
     }
     return {};
 }
-

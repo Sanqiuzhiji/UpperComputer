@@ -22,6 +22,7 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -45,12 +46,15 @@ QString effectiveFieldName(const FieldDefinition &field, const int index)
     return QStringLiteral("data%1").arg(index + 1);
 }
 
-bool isAutomaticRole(const ProtocolFieldRole role)
+bool isUserDataField(const FieldDefinition &field)
 {
-    return role == ProtocolFieldRole::FrameHeader
-        || role == ProtocolFieldRole::Length
-        || role == ProtocolFieldRole::MessageId
-        || role == ProtocolFieldRole::Checksum;
+    return field.role == ProtocolFieldRole::Value && field.editable;
+}
+
+bool usesIdentityScale(const FieldDefinition &field)
+{
+    return qFuzzyCompare(field.scale, 1.0)
+        && qFuzzyIsNull(field.offset);
 }
 }
 
@@ -248,6 +252,18 @@ void SendPanel::setProtocols(const QList<ProtocolDefinition> &protocols)
 {
     saveCustomDrafts();
     m_protocols = protocols;
+    for (auto iterator = m_encoders.begin();
+         iterator != m_encoders.end();) {
+        const bool exists = std::ranges::any_of(
+            m_protocols, [&iterator](const ProtocolDefinition &protocol) {
+                return protocol.id == iterator->first;
+            });
+        if (exists) {
+            ++iterator;
+        } else {
+            iterator = m_encoders.erase(iterator);
+        }
+    }
     QString selected = m_currentProtocolId;
     if (selected.isEmpty()) {
         selected = m_context->settings()->customProtocolId();
@@ -407,7 +423,7 @@ void SendPanel::rebuildDynamicFields()
 
     int displayIndex = 0;
     for (const FieldDefinition &field : message->fields) {
-        if (isAutomaticRole(field.role)) continue;
+        if (!isUserDataField(field)) continue;
         QWidget *row = new QFrame(m_fieldContainer);
         row->setProperty("channelRow", true);
         auto *layout = new QHBoxLayout(row);
@@ -444,7 +460,8 @@ void SendPanel::rebuildDynamicFields()
                     this, &SendPanel::saveCustomDrafts);
             if (field.editable
                 && (field.type == ProtocolFieldType::Int
-                    || field.type == ProtocolFieldType::UInt)) {
+                    || field.type == ProtocolFieldType::UInt)
+                && usesIdentityScale(field)) {
                 connect(line, &QLineEdit::editingFinished, this,
                         [this, editor] {
                             for (FieldEditor &candidate : m_fieldEditors) {
@@ -568,7 +585,7 @@ bool SendPanel::collectCustomValues(
          fieldIndex < static_cast<int>(message->fields.size());
          ++fieldIndex) {
         const FieldDefinition &field = message->fields.at(fieldIndex);
-        if (isAutomaticRole(field.role)) {
+        if (!isUserDataField(field)) {
             const QString key = effectiveFieldId(field, fieldIndex);
             const QVariant value = field.fixedValue.isValid()
                 ? field.fixedValue : field.defaultValue;
@@ -599,36 +616,21 @@ bool SendPanel::fieldValue(
     FieldEditor &editor, QVariant *value, QString *error)
 {
     const FieldDefinition &field = editor.definition;
-    if (field.type == ProtocolFieldType::Int
-        || field.type == ProtocolFieldType::UInt) {
+    if ((field.type == ProtocolFieldType::Int
+         || field.type == ProtocolFieldType::UInt)
+        && usesIdentityScale(field)) {
         return normalizeIntegerEditor(editor, value, error);
     }
-    if (field.type == ProtocolFieldType::Bool) {
-        *value = qobject_cast<QCheckBox *>(editor.editor)->isChecked();
-        setInvalid(editor.editor, false);
-        return true;
-    }
-    if (field.type == ProtocolFieldType::Enum) {
-        auto *combo = qobject_cast<QComboBox *>(editor.editor);
-        if (combo->currentIndex() < 0) {
-            *error = tr("字段“%1”没有可选枚举值")
-                         .arg(field.displayName);
-            setInvalid(combo, true);
-            return false;
-        }
-        *value = combo->currentData();
-        setInvalid(combo, false);
-        return true;
-    }
-
-    auto *line = qobject_cast<QLineEdit *>(editor.editor);
-    const QString text = line->text().trimmed();
-    if (field.type == ProtocolFieldType::Float
+    if (field.type == ProtocolFieldType::Int
+        || field.type == ProtocolFieldType::UInt
+        || field.type == ProtocolFieldType::Float
         || field.type == ProtocolFieldType::Double) {
+        auto *line = qobject_cast<QLineEdit *>(editor.editor);
+        const QString text = line->text().trimmed();
         bool ok = false;
         const double number = text.toDouble(&ok);
         if (!ok || !std::isfinite(number)) {
-            *error = tr("字段“%1”需要有效的小数")
+            *error = tr("字段“%1”需要有效的数值")
                          .arg(field.displayName);
             setInvalid(line, true);
             return false;
@@ -651,6 +653,26 @@ bool SendPanel::fieldValue(
         setInvalid(line, false);
         return true;
     }
+    if (field.type == ProtocolFieldType::Bool) {
+        *value = qobject_cast<QCheckBox *>(editor.editor)->isChecked();
+        setInvalid(editor.editor, false);
+        return true;
+    }
+    if (field.type == ProtocolFieldType::Enum) {
+        auto *combo = qobject_cast<QComboBox *>(editor.editor);
+        if (combo->currentIndex() < 0) {
+            *error = tr("字段“%1”没有可选枚举值")
+                         .arg(field.displayName);
+            setInvalid(combo, true);
+            return false;
+        }
+        *value = combo->currentData();
+        setInvalid(combo, false);
+        return true;
+    }
+
+    auto *line = qobject_cast<QLineEdit *>(editor.editor);
+    const QString text = line->text().trimmed();
     if (field.type == ProtocolFieldType::ByteArray) {
         QString normalized = text;
         normalized.replace(
@@ -844,7 +866,7 @@ void SendPanel::updateCustomState()
                || !m_encoders.at(protocol->id)) {
         status = tr("当前协议尚无编码器");
     } else {
-        status = tr("填写字段后可预览或发送");
+        status = tr("只需填写 Data 字段，其他内容将自动生成");
         ready = true;
     }
     m_customStatus->setText(status);

@@ -6,6 +6,8 @@
 #include "pages/communication/HardwareConfigPanel.h"
 #include "pages/communication/SendPanel.h"
 #include "services/ConnectionManager.h"
+#include "services/CustomBinaryCodec.h"
+#include "services/ProtocolRepository.h"
 
 #include <QSplitter>
 #include <QVBoxLayout>
@@ -44,6 +46,13 @@ CommunicationPage::CommunicationPage(
     m_sendPanel->setTextEncoding(m_monitorPanel->textEncoding());
     m_monitorPanel->setReceiveMode(m_modePanel->receiveMode());
     m_sendPanel->setSendMode(m_modePanel->sendMode());
+    setProtocols(context->protocolRepository()->communicationDefinitions());
+    connect(context->protocolRepository(),
+            &ProtocolRepository::protocolLibraryChanged,
+            this, [this, context] {
+                setProtocols(
+                    context->protocolRepository()->communicationDefinitions());
+            });
 
     connect(m_hardwarePanel, &HardwareConfigPanel::connectRequested,
             manager, &ConnectionManager::connectTransport);
@@ -128,6 +137,7 @@ CommunicationPage::CommunicationPage(
     connect(m_modePanel, &CommunicationModePanel::customProtocolChanged,
             this, [this](const QString &protocolId) {
                 m_sendPanel->setCurrentProtocolId(protocolId);
+                installCustomBinaryParser(protocolId);
                 emit customProtocolChanged(protocolId);
             });
     connect(m_modePanel, &CommunicationModePanel::requestProtocolLibrary,
@@ -137,9 +147,17 @@ CommunicationPage::CommunicationPage(
 void CommunicationPage::setProtocols(
     const QList<ProtocolDefinition> &protocols)
 {
+    m_protocols = protocols;
+    m_customCodecs.clear();
     m_modePanel->setProtocols(protocols);
     m_sendPanel->setProtocols(protocols);
+    for (const ProtocolDefinition &protocol : protocols) {
+        auto codec = std::make_shared<CustomBinaryCodec>(protocol);
+        m_customCodecs.insert(protocol.id, codec);
+        m_sendPanel->setEncoder(protocol.id, codec);
+    }
     m_sendPanel->setCurrentProtocolId(m_modePanel->currentProtocolId());
+    installCustomBinaryParser(m_modePanel->currentProtocolId());
 }
 
 void CommunicationPage::setReceiveParser(
@@ -154,6 +172,21 @@ void CommunicationPage::setCustomBinaryEncoder(
     std::shared_ptr<const CustomBinaryEncoder> encoder)
 {
     m_sendPanel->setEncoder(protocolId, std::move(encoder));
+}
+
+void CommunicationPage::installCustomBinaryParser(
+    const QString &protocolId)
+{
+    for (const ProtocolDefinition &protocol : m_protocols) {
+        if (protocol.id != protocolId) continue;
+        m_monitorPanel->setParser(
+            ParserMode::CustomBinary,
+            std::make_shared<CustomBinaryCodec>(protocol));
+        return;
+    }
+    m_monitorPanel->setParser(
+        ParserMode::CustomBinary,
+        std::shared_ptr<const CommunicationParser>{});
 }
 
 void CommunicationPage::notify(

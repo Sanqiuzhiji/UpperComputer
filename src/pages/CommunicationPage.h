@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QList>
+#include <QHash>
 #include <QWidget>
 
 #include <memory>
@@ -13,6 +14,7 @@ class AppContext;
 class CommunicationModePanel;
 class CommunicationMonitorPanel;
 class CommunicationParser;
+class CustomBinaryCodec;
 class CustomBinaryEncoder;
 class HardwareConfigPanel;
 class QSplitter;
@@ -41,6 +43,7 @@ signals:
     void requestProtocolLibrary();
 
 private:
+    void installCustomBinaryParser(const QString &protocolId);
     void notify(const QString &message, NotificationType type) const;
 
     AppContext *m_context{};
@@ -49,6 +52,7 @@ private:
     CommunicationMonitorPanel *m_monitorPanel{};
     SendPanel *m_sendPanel{};
     QSplitter *m_dataSplitter{};
+    QList<ProtocolDefinition> m_protocols;
+    QHash<QString, std::shared_ptr<CustomBinaryCodec>> m_customCodecs;
     ConnectionState m_previousState{ConnectionState::Disconnected};
 };
-

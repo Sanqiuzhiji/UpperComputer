@@ -369,13 +369,17 @@ void CommunicationMonitorPanel::appendEntry(const MonitorEntry &entry)
             .arg(entry.timestamp.toString(QStringLiteral("HH:mm:ss.zzz")));
     }
     prefix += entry.direction == DataDirection::Receive
-        ? QStringLiteral("RX ") : QStringLiteral("TX ");
+        ? QStringLiteral("[RX] ") : QStringLiteral("[TX] ");
     cursor.insertText(prefix, prefixFormat);
     m_terminal->setTextCursor(cursor);
     if (entry.structured) {
         QStringList fields;
         for (qsizetype i = 0; i < entry.fields.size(); ++i) {
             const ParsedField &field = entry.fields.at(i);
+            if (m_receiveMode == ParserMode::CustomBinary
+                && field.role != ProtocolFieldRole::Value) {
+                continue;
+            }
             const QString name = field.displayName.trimmed().isEmpty()
                 ? QStringLiteral("data%1").arg(i + 1)
                 : field.displayName;
@@ -386,7 +390,7 @@ void CommunicationMonitorPanel::appendEntry(const MonitorEntry &entry)
             fields.append(QStringLiteral("%1: %2").arg(name, value));
         }
         const QString messageName = entry.messageName.trimmed();
-        const QString text = messageName.isEmpty()
+        const QString text = messageName.isEmpty() || fields.isEmpty()
             ? fields.join(QStringLiteral("  |  "))
             : QStringLiteral("%1  |  %2")
                   .arg(messageName, fields.join(QStringLiteral("  |  ")));

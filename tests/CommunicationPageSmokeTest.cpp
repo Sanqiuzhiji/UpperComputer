@@ -1,8 +1,10 @@
 #include "app/AppContext.h"
 #include "models/ProtocolDefinition.h"
 #include "pages/CommunicationPage.h"
+#include "pages/communication/CommunicationMonitorPanel.h"
 #include "pages/communication/SendPanel.h"
 #include "services/ConnectionManager.h"
+#include "services/CustomBinaryCodec.h"
 #include "theme/ThemeManager.h"
 
 #include <QApplication>
@@ -39,6 +41,23 @@ bool selectComboData(QComboBox *combo, const QVariant &value)
 
 ProtocolDefinition testProtocol()
 {
+    FieldDefinition header;
+    header.id = QStringLiteral("header");
+    header.displayName = QStringLiteral("Header");
+    header.type = ProtocolFieldType::ByteArray;
+    header.bitWidth = 16;
+    header.editable = false;
+    header.fixedValue = QByteArray::fromHex("AA55");
+    header.role = ProtocolFieldRole::FrameHeader;
+
+    FieldDefinition length;
+    length.id = QStringLiteral("length");
+    length.displayName = QStringLiteral("Length");
+    length.type = ProtocolFieldType::UInt;
+    length.bitWidth = 8;
+    length.editable = false;
+    length.role = ProtocolFieldRole::Length;
+
     FieldDefinition signedField;
     signedField.id = QStringLiteral("signedValue");
     signedField.displayName = QStringLiteral("Signed value");
@@ -55,10 +74,29 @@ ProtocolDefinition testProtocol()
     unsignedField.maximum = 255;
     unsignedField.defaultValue = QStringLiteral("0");
 
+    FieldDefinition checksum;
+    checksum.id = QStringLiteral("checksum");
+    checksum.displayName = QStringLiteral("Checksum");
+    checksum.type = ProtocolFieldType::UInt;
+    checksum.bitWidth = 8;
+    checksum.editable = false;
+    checksum.role = ProtocolFieldRole::Checksum;
+    checksum.checksumAlgorithm = ProtocolChecksumAlgorithm::Sum8;
+
+    FieldDefinition tail;
+    tail.id = QStringLiteral("tail");
+    tail.displayName = QStringLiteral("Tail");
+    tail.type = ProtocolFieldType::ByteArray;
+    tail.bitWidth = 8;
+    tail.editable = false;
+    tail.fixedValue = QByteArray::fromHex("0D");
+    tail.role = ProtocolFieldRole::Constant;
+
     MessageDefinition message;
     message.id = QStringLiteral("set-values");
     message.displayName = QStringLiteral("Set values");
-    message.fields = {signedField, unsignedField};
+    message.fields = {
+        header, length, signedField, unsignedField, checksum, tail};
 
     FieldDefinition noteField;
     noteField.id = QStringLiteral("note");
@@ -72,6 +110,7 @@ ProtocolDefinition testProtocol()
     ProtocolDefinition protocol;
     protocol.id = QStringLiteral("test-protocol");
     protocol.displayName = QStringLiteral("Test protocol");
+    protocol.receiveMessages = {message, otherMessage};
     protocol.sendMessages = {message, otherMessage};
     return protocol;
 }
@@ -101,8 +140,8 @@ int main(int argc, char *argv[])
         page.findChild<QWidget *>(QStringLiteral("hardwareConfigPanel"));
     QWidget *mode =
         page.findChild<QWidget *>(QStringLiteral("communicationModePanel"));
-    QWidget *monitor =
-        page.findChild<QWidget *>(
+    auto *monitor =
+        page.findChild<CommunicationMonitorPanel *>(
             QStringLiteral("communicationMonitorPanel"));
     auto *send =
         page.findChild<SendPanel *>(QStringLiteral("sendPanel"));
@@ -246,11 +285,65 @@ int main(int argc, char *argv[])
     auto *customSendButton =
         page.findChild<QPushButton *>(QStringLiteral("customSendButton"));
     int sentPayloads = 0;
+    QByteArray lastPayload;
     QObject::connect(send, &SendPanel::sendRequested,
-                     &app, [&](const QByteArray &) { ++sentPayloads; });
-    if (!customSendButton || customSendButton->isEnabled()) return 19;
+                     &app, [&](const QByteArray &payload) {
+                         ++sentPayloads;
+                         lastPayload = payload;
+                     });
+    unsignedEditor->setText(QStringLiteral("10"));
+    if (!customSendButton || !customSendButton->isEnabled()) return 19;
     customSendButton->click();
-    if (sentPayloads != 0) return 20;
+    if (sentPayloads != 1
+        || lastPayload != QByteArray::fromHex("AA550819000A2A0D")) {
+        return 20;
+    }
+
+    CustomBinaryCodec chunkedCodec(testProtocol());
+    QList<ParsedMessage> parsedMessages;
+    QString parseError;
+    if (!chunkedCodec.parse(
+            lastPayload.left(3), &parsedMessages, &parseError)
+        || !parsedMessages.isEmpty()
+        || !chunkedCodec.parse(
+            lastPayload.mid(3), &parsedMessages, &parseError)
+        || parsedMessages.size() != 1
+        || parsedMessages.constFirst().displayName
+            != QStringLiteral("Set values")) {
+        return 21;
+    }
+    QByteArray damagedPayload = lastPayload;
+    damagedPayload[6] =
+        static_cast<char>(static_cast<quint8>(damagedPayload.at(6)) ^ 0x01U);
+    CustomBinaryCodec rejectingCodec(testProtocol());
+    parsedMessages.clear();
+    parseError.clear();
+    if (rejectingCodec.parse(
+            damagedPayload, &parsedMessages, &parseError)
+        || !parsedMessages.isEmpty()
+        || !parseError.contains(QStringLiteral("校验失败"))) {
+        return 22;
+    }
+
+    if (!selectComboData(
+            receiveCombo, QVariant::fromValue(ParserMode::CustomBinary))) {
+        return 23;
+    }
+    monitor->addEntry(DataDirection::Transmit, lastPayload);
+    monitor->addEntry(DataDirection::Receive, lastPayload);
+    waitForEvents(30);
+    const QString customBinaryDisplay = display->toPlainText();
+    if (!customBinaryDisplay.contains(QStringLiteral("[RX] Set values"))
+        || !customBinaryDisplay.contains(
+            QStringLiteral("[TX] HEX: AA 55 08 19 00 0A 2A 0D"))
+        || !display->toPlainText().contains(QStringLiteral("Signed value"))
+        || !display->toPlainText().contains(QStringLiteral("25"))
+        || customBinaryDisplay.contains(QStringLiteral("Header:"))
+        || customBinaryDisplay.contains(QStringLiteral("Length:"))
+        || customBinaryDisplay.contains(QStringLiteral("Checksum:"))
+        || customBinaryDisplay.contains(QStringLiteral("Tail:"))) {
+        return 24;
+    }
 
     page.resize(960, 640);
     context.themeManager()->setMode(ThemeMode::Light);
@@ -260,7 +353,7 @@ int main(int argc, char *argv[])
     if (!hardware->isVisible() || !mode->isVisible()
         || !monitor->isVisible() || !send->isVisible()
         || page.size() != QSize(960, 640)) {
-        return 21;
+        return 25;
     }
 
     context.connectionManager()->disconnectTransport();

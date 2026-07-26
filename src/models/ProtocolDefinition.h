@@ -26,6 +26,12 @@ enum class ProtocolFieldRole {
     Checksum
 };
 
+enum class ProtocolChecksumAlgorithm {
+    Sum8,
+    Xor8,
+    Crc8
+};
+
 struct EnumOption {
     QString displayName;
     QVariant value;
@@ -45,6 +51,11 @@ struct FieldDefinition {
     QVariant fixedValue;
     ProtocolFieldRole role{ProtocolFieldRole::Value};
     QString description;
+    bool littleEndian{true};
+    double scale{1.0};
+    double offset{0.0};
+    ProtocolChecksumAlgorithm checksumAlgorithm{
+        ProtocolChecksumAlgorithm::Sum8};
 };
 
 struct MessageDefinition {
@@ -64,6 +75,7 @@ struct ParsedField {
     QString displayName;
     QVariant value;
     QString unit;
+    ProtocolFieldRole role{ProtocolFieldRole::Value};
 };
 
 struct ParsedMessage {
@@ -75,3 +87,4 @@ using ProtocolFieldValues = QHash<QString, QVariant>;
 
 Q_DECLARE_METATYPE(ProtocolFieldType)
 Q_DECLARE_METATYPE(ProtocolFieldRole)
+Q_DECLARE_METATYPE(ProtocolChecksumAlgorithm)

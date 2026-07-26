@@ -27,5 +27,16 @@
         <file alias="connection/send.svg">icons/connection/send.svg</file>
         <file alias="connection/text.svg">icons/connection/text.svg</file>
         <file alias="connection/hex.svg">icons/connection/hex.svg</file>
+        <file alias="protocol/new.svg">icons/protocol/new.svg</file>
+        <file alias="protocol/add_frame.svg">icons/protocol/add_frame.svg</file>
+        <file alias="protocol/refresh.svg">icons/protocol/refresh.svg</file>
+        <file alias="protocol/undo.svg">icons/protocol/undo.svg</file>
+        <file alias="protocol/redo.svg">icons/protocol/redo.svg</file>
+        <file alias="protocol/copy.svg">icons/protocol/copy.svg</file>
+        <file alias="protocol/paste.svg">icons/protocol/paste.svg</file>
+        <file alias="protocol/delete.svg">icons/protocol/delete.svg</file>
+        <file alias="protocol/import.svg">icons/protocol/import.svg</file>
+        <file alias="protocol/save.svg">icons/protocol/save.svg</file>
+        <file alias="protocol/save_as.svg">icons/protocol/save_as.svg</file>
     </qresource>
 </RCC>

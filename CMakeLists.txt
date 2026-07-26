@@ -26,6 +26,8 @@ qt_add_executable(UpperComputer WIN32
     src/models/AppTypes.h
     src/models/ConnectionTypes.h
     src/models/ProtocolDefinition.h
+    src/models/ProtocolTypes.h
+    src/models/ProtocolTypes.cpp
     src/app/AppSettings.h
     src/app/AppSettings.cpp
     src/app/AppContext.h
@@ -33,6 +35,10 @@ qt_add_executable(UpperComputer WIN32
     src/services/ConnectionManager.h
     src/services/ConnectionManager.cpp
     src/services/CommunicationCodec.h
+    src/services/CustomBinaryCodec.h
+    src/services/CustomBinaryCodec.cpp
+    src/services/ProtocolRepository.h
+    src/services/ProtocolRepository.cpp
     src/services/transports/AbstractTransport.h
     src/services/transports/AbstractTransport.cpp
     src/services/transports/SerialTransport.h
@@ -62,6 +68,17 @@ qt_add_executable(UpperComputer WIN32
     src/pages/communication/SendPanel.cpp
     src/pages/ProtocolEditorPage.h
     src/pages/ProtocolEditorPage.cpp
+    src/pages/protocol/ProtocolMime.h
+    src/pages/protocol/FieldLibraryPanel.h
+    src/pages/protocol/FieldLibraryPanel.cpp
+    src/pages/protocol/ProtocolCanvas.h
+    src/pages/protocol/ProtocolCanvas.cpp
+    src/pages/protocol/ProtocolFrameWidget.h
+    src/pages/protocol/ProtocolFrameWidget.cpp
+    src/pages/protocol/ProtocolFieldCard.h
+    src/pages/protocol/ProtocolFieldCard.cpp
+    src/pages/protocol/ProtocolPropertyPanel.h
+    src/pages/protocol/ProtocolPropertyPanel.cpp
     src/pages/CanBusPage.h
     src/pages/CanBusPage.cpp
     src/pages/MdfViewerPage.h
@@ -179,6 +196,8 @@ if(BUILD_TESTING)
         src/models/AppTypes.h
         src/models/ConnectionTypes.h
         src/models/ProtocolDefinition.h
+        src/models/ProtocolTypes.h
+        src/models/ProtocolTypes.cpp
         src/pages/PageId.h
         src/app/AppSettings.h
         src/app/AppSettings.cpp
@@ -187,6 +206,10 @@ if(BUILD_TESTING)
         src/services/ConnectionManager.h
         src/services/ConnectionManager.cpp
         src/services/CommunicationCodec.h
+        src/services/CustomBinaryCodec.h
+        src/services/CustomBinaryCodec.cpp
+        src/services/ProtocolRepository.h
+        src/services/ProtocolRepository.cpp
         src/services/transports/AbstractTransport.h
         src/services/transports/AbstractTransport.cpp
         src/services/transports/SerialTransport.h
@@ -239,6 +262,75 @@ if(BUILD_TESTING)
                     "$<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin>"
                     "$<TARGET_FILE_DIR:CommunicationPageSmokeTest>/platforms"
             COMMENT "Deploying the offscreen Qt platform for UI smoke tests"
+        )
+    endif()
+
+    qt_add_executable(ProtocolEditorTest
+        tests/ProtocolEditorTest.cpp
+        resources/resources.qrc
+        src/models/AppTypes.h
+        src/models/ConnectionTypes.h
+        src/models/ProtocolDefinition.h
+        src/models/ProtocolTypes.h
+        src/models/ProtocolTypes.cpp
+        src/pages/PageId.h
+        src/app/AppSettings.h
+        src/app/AppSettings.cpp
+        src/app/AppContext.h
+        src/app/AppContext.cpp
+        src/services/ConnectionManager.h
+        src/services/ConnectionManager.cpp
+        src/services/ProtocolRepository.h
+        src/services/ProtocolRepository.cpp
+        src/services/transports/AbstractTransport.h
+        src/services/transports/AbstractTransport.cpp
+        src/services/transports/SerialTransport.h
+        src/services/transports/SerialTransport.cpp
+        src/services/transports/NetworkTransports.h
+        src/services/transports/NetworkTransports.cpp
+        src/services/transports/VirtualTransport.h
+        src/services/transports/VirtualTransport.cpp
+        src/theme/ThemeManager.h
+        src/theme/ThemeManager.cpp
+        src/theme/IconManager.h
+        src/theme/IconManager.cpp
+        src/pages/ProtocolEditorPage.h
+        src/pages/ProtocolEditorPage.cpp
+        src/pages/protocol/ProtocolMime.h
+        src/pages/protocol/FieldLibraryPanel.h
+        src/pages/protocol/FieldLibraryPanel.cpp
+        src/pages/protocol/ProtocolCanvas.h
+        src/pages/protocol/ProtocolCanvas.cpp
+        src/pages/protocol/ProtocolFrameWidget.h
+        src/pages/protocol/ProtocolFrameWidget.cpp
+        src/pages/protocol/ProtocolFieldCard.h
+        src/pages/protocol/ProtocolFieldCard.cpp
+        src/pages/protocol/ProtocolPropertyPanel.h
+        src/pages/protocol/ProtocolPropertyPanel.cpp
+    )
+    target_include_directories(ProtocolEditorTest PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_link_libraries(ProtocolEditorTest PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Widgets
+        Qt6::Svg
+        Qt6::Network
+        Qt6::SerialPort
+    )
+    if(MSVC)
+        target_compile_options(ProtocolEditorTest PRIVATE
+            /W4 /utf-8 /permissive-)
+    endif()
+    add_test(NAME ProtocolEditorTest COMMAND ProtocolEditorTest)
+    if(WIN32)
+        add_custom_command(TARGET ProtocolEditorTest POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                    "$<TARGET_FILE_DIR:ProtocolEditorTest>/platforms"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "$<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin>"
+                    "$<TARGET_FILE_DIR:ProtocolEditorTest>/platforms"
+            COMMENT "Deploying the offscreen Qt platform for protocol tests"
         )
     endif()
 endif()

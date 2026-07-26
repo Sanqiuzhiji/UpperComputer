@@ -8,6 +8,7 @@
 class AppSettings;
 class ConnectionManager;
 class IconManager;
+class ProtocolRepository;
 class ThemeManager;
 
 class AppContext final : public QObject
@@ -21,6 +22,7 @@ public:
     [[nodiscard]] ConnectionManager *connectionManager() const noexcept;
     [[nodiscard]] ThemeManager *themeManager() const noexcept;
     [[nodiscard]] IconManager *iconManager() const noexcept;
+    [[nodiscard]] ProtocolRepository *protocolRepository() const noexcept;
 
     void notify(const QString &message,
                 NotificationType type = NotificationType::Information);
@@ -33,4 +35,5 @@ private:
     ConnectionManager *m_connectionManager{};
     ThemeManager *m_themeManager{};
     IconManager *m_iconManager{};
+    ProtocolRepository *m_protocolRepository{};
 };
