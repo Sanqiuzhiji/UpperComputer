@@ -5,6 +5,7 @@
 #include "pages/PageRegistry.h"
 #include "pages/SettingsPage.h"
 #include "services/ConnectionManager.h"
+#include "pages/CommunicationPage.h"
 #include "theme/IconManager.h"
 #include "theme/ThemeManager.h"
 #include "widgets/SideNavigation.h"
@@ -397,6 +398,15 @@ QWidget *MainWindow::ensurePage(const PageId id)
 
 void MainWindow::configurePage(const PageId id, QWidget *page)
 {
+    if (id == PageId::Communication) {
+        auto *communicationPage = qobject_cast<CommunicationPage *>(page);
+        if (communicationPage) {
+            connect(communicationPage,
+                    &CommunicationPage::requestProtocolLibrary,
+                    this, [this] { switchPage(PageId::ProtocolEditor); });
+        }
+        return;
+    }
     if (id != PageId::Settings) {
         return;
     }

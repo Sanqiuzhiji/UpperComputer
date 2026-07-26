@@ -25,12 +25,14 @@ qt_add_executable(UpperComputer WIN32
     resources/resources.qrc
     src/models/AppTypes.h
     src/models/ConnectionTypes.h
+    src/models/ProtocolDefinition.h
     src/app/AppSettings.h
     src/app/AppSettings.cpp
     src/app/AppContext.h
     src/app/AppContext.cpp
     src/services/ConnectionManager.h
     src/services/ConnectionManager.cpp
+    src/services/CommunicationCodec.h
     src/services/transports/AbstractTransport.h
     src/services/transports/AbstractTransport.cpp
     src/services/transports/SerialTransport.h
@@ -48,16 +50,16 @@ qt_add_executable(UpperComputer WIN32
     src/pages/PageRegistry.cpp
     src/pages/PlotPage.h
     src/pages/PlotPage.cpp
-    src/pages/ConnectionPage.h
-    src/pages/ConnectionPage.cpp
-    src/pages/connection/HardwareConfigPanel.h
-    src/pages/connection/HardwareConfigPanel.cpp
-    src/pages/connection/ParserConfigPanel.h
-    src/pages/connection/ParserConfigPanel.cpp
-    src/pages/connection/TerminalPanel.h
-    src/pages/connection/TerminalPanel.cpp
-    src/pages/connection/SendPanel.h
-    src/pages/connection/SendPanel.cpp
+    src/pages/CommunicationPage.h
+    src/pages/CommunicationPage.cpp
+    src/pages/communication/HardwareConfigPanel.h
+    src/pages/communication/HardwareConfigPanel.cpp
+    src/pages/communication/CommunicationModePanel.h
+    src/pages/communication/CommunicationModePanel.cpp
+    src/pages/communication/CommunicationMonitorPanel.h
+    src/pages/communication/CommunicationMonitorPanel.cpp
+    src/pages/communication/SendPanel.h
+    src/pages/communication/SendPanel.cpp
     src/pages/ProtocolEditorPage.h
     src/pages/ProtocolEditorPage.cpp
     src/pages/CanBusPage.h
@@ -171,11 +173,12 @@ if(BUILD_TESTING)
     add_test(NAME AppSettingsPersistenceTest
         COMMAND AppSettingsPersistenceTest)
 
-    qt_add_executable(ConnectionPageSmokeTest
-        tests/ConnectionPageSmokeTest.cpp
+    qt_add_executable(CommunicationPageSmokeTest
+        tests/CommunicationPageSmokeTest.cpp
         resources/resources.qrc
         src/models/AppTypes.h
         src/models/ConnectionTypes.h
+        src/models/ProtocolDefinition.h
         src/pages/PageId.h
         src/app/AppSettings.h
         src/app/AppSettings.cpp
@@ -183,6 +186,7 @@ if(BUILD_TESTING)
         src/app/AppContext.cpp
         src/services/ConnectionManager.h
         src/services/ConnectionManager.cpp
+        src/services/CommunicationCodec.h
         src/services/transports/AbstractTransport.h
         src/services/transports/AbstractTransport.cpp
         src/services/transports/SerialTransport.h
@@ -199,20 +203,20 @@ if(BUILD_TESTING)
         src/widgets/FocusUnderline.cpp
         src/utils/ChecksumUtils.h
         src/utils/ChecksumUtils.cpp
-        src/pages/ConnectionPage.h
-        src/pages/ConnectionPage.cpp
-        src/pages/connection/HardwareConfigPanel.h
-        src/pages/connection/HardwareConfigPanel.cpp
-        src/pages/connection/ParserConfigPanel.h
-        src/pages/connection/ParserConfigPanel.cpp
-        src/pages/connection/TerminalPanel.h
-        src/pages/connection/TerminalPanel.cpp
-        src/pages/connection/SendPanel.h
-        src/pages/connection/SendPanel.cpp
+        src/pages/CommunicationPage.h
+        src/pages/CommunicationPage.cpp
+        src/pages/communication/HardwareConfigPanel.h
+        src/pages/communication/HardwareConfigPanel.cpp
+        src/pages/communication/CommunicationModePanel.h
+        src/pages/communication/CommunicationModePanel.cpp
+        src/pages/communication/CommunicationMonitorPanel.h
+        src/pages/communication/CommunicationMonitorPanel.cpp
+        src/pages/communication/SendPanel.h
+        src/pages/communication/SendPanel.cpp
     )
-    target_include_directories(ConnectionPageSmokeTest PRIVATE
+    target_include_directories(CommunicationPageSmokeTest PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src")
-    target_link_libraries(ConnectionPageSmokeTest PRIVATE
+    target_link_libraries(CommunicationPageSmokeTest PRIVATE
         Qt6::Core
         Qt6::Concurrent
         Qt6::Gui
@@ -222,17 +226,18 @@ if(BUILD_TESTING)
         Qt6::SerialPort
     )
     if(MSVC)
-        target_compile_options(ConnectionPageSmokeTest PRIVATE
+        target_compile_options(CommunicationPageSmokeTest PRIVATE
             /W4 /utf-8 /permissive-)
     endif()
-    add_test(NAME ConnectionPageSmokeTest COMMAND ConnectionPageSmokeTest)
+    add_test(NAME CommunicationPageSmokeTest
+        COMMAND CommunicationPageSmokeTest)
     if(WIN32)
-        add_custom_command(TARGET ConnectionPageSmokeTest POST_BUILD
+        add_custom_command(TARGET CommunicationPageSmokeTest POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory
-                    "$<TARGET_FILE_DIR:ConnectionPageSmokeTest>/platforms"
+                    "$<TARGET_FILE_DIR:CommunicationPageSmokeTest>/platforms"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "$<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin>"
-                    "$<TARGET_FILE_DIR:ConnectionPageSmokeTest>/platforms"
+                    "$<TARGET_FILE_DIR:CommunicationPageSmokeTest>/platforms"
             COMMENT "Deploying the offscreen Qt platform for UI smoke tests"
         )
     endif()

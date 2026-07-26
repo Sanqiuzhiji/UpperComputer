@@ -4,7 +4,7 @@
 
 enum class PageId {
     Plot,
-    Connection,
+    Communication,
     ProtocolEditor,
     CanBus,
     MdfViewer,

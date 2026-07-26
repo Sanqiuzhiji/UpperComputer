@@ -23,6 +23,11 @@ enum class ParserMode {
     CustomBinary
 };
 
+enum class SendMode {
+    RawData,
+    CustomBinary
+};
+
 enum class DataDirection {
     Receive,
     Transmit
@@ -115,6 +120,7 @@ struct TerminalEntry {
 
 Q_DECLARE_METATYPE(TransportType)
 Q_DECLARE_METATYPE(ParserMode)
+Q_DECLARE_METATYPE(SendMode)
 Q_DECLARE_METATYPE(DataDirection)
 Q_DECLARE_METATYPE(TerminalDisplayMode)
 Q_DECLARE_METATYPE(TextEncoding)

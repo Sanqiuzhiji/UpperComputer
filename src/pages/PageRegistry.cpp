@@ -2,7 +2,7 @@
 
 #include "pages/AboutPage.h"
 #include "pages/CanBusPage.h"
-#include "pages/ConnectionPage.h"
+#include "pages/CommunicationPage.h"
 #include "pages/MdfViewerPage.h"
 #include "pages/PlotPage.h"
 #include "pages/ProtocolEditorPage.h"
@@ -14,21 +14,12 @@ const QList<PageDescriptor> &pageDescriptors()
 {
     static const QList<PageDescriptor> descriptors{
         {
-            PageId::Plot,
-            QObject::tr("Plot"),
-            QStringLiteral(":/icons/navigation/plot.svg"),
-            false,
-            [](AppContext *context, QWidget *parent) {
-                return new PlotPage(context, parent);
-            }
-        },
-        {
-            PageId::Connection,
-            QObject::tr("Connection"),
+            PageId::Communication,
+            QObject::tr("Communication"),
             QStringLiteral(":/icons/navigation/connection.svg"),
             false,
             [](AppContext *context, QWidget *parent) {
-                return new ConnectionPage(context, parent);
+                return new CommunicationPage(context, parent);
             }
         },
         {
@@ -38,6 +29,15 @@ const QList<PageDescriptor> &pageDescriptors()
             false,
             [](AppContext *context, QWidget *parent) {
                 return new ProtocolEditorPage(context, parent);
+            }
+        },
+        {
+            PageId::Plot,
+            QObject::tr("Plot"),
+            QStringLiteral(":/icons/navigation/plot.svg"),
+            false,
+            [](AppContext *context, QWidget *parent) {
+                return new PlotPage(context, parent);
             }
         },
         {

@@ -4,28 +4,40 @@
 #include <QFrame>
 #include <QList>
 
+#include <map>
+#include <memory>
+
 #include "models/AppTypes.h"
 #include "models/ConnectionTypes.h"
+#include "models/ProtocolDefinition.h"
 
 class AppContext;
+class CommunicationParser;
 class QComboBox;
 class QTextCharFormat;
 class QTextEdit;
 class QTimer;
 class QToolButton;
 
-class TerminalPanel final : public QFrame
+class CommunicationMonitorPanel final : public QFrame
 {
     Q_OBJECT
 
 public:
-    explicit TerminalPanel(AppContext *context, QWidget *parent = nullptr);
-    ~TerminalPanel() override;
+    explicit CommunicationMonitorPanel(
+        AppContext *context, QWidget *parent = nullptr);
+    ~CommunicationMonitorPanel() override;
 
     [[nodiscard]] TextEncoding textEncoding() const;
     [[nodiscard]] QString decode(const QByteArray &bytes) const;
+    [[nodiscard]] ParserMode receiveMode() const noexcept;
+
+    void setParser(
+        ParserMode mode,
+        std::shared_ptr<const CommunicationParser> parser);
 
 public slots:
+    void setReceiveMode(ParserMode mode);
     void addEntry(DataDirection direction, const QByteArray &bytes);
     void clearEntries();
 
@@ -34,17 +46,29 @@ signals:
     void notificationRequested(const QString &message, NotificationType type);
 
 private:
+    struct MonitorEntry {
+        QDateTime timestamp;
+        DataDirection direction{DataDirection::Receive};
+        QByteArray rawData;
+        QString messageName;
+        QList<ParsedField> fields;
+        bool structured{};
+    };
+
     QToolButton *createToolButton(const QString &text,
                                   const QString &toolTip,
                                   const QString &iconPath = {});
     void refreshIcons();
     void flushPending();
     void renderAll();
-    void appendEntry(const TerminalEntry &entry);
+    void appendEntry(const MonitorEntry &entry);
     void appendAnsiText(const QString &text);
     void applySgrCode(const QString &code, QTextCharFormat *format) const;
+    void showModeEmptyState();
+    void updateToolbarForMode();
     [[nodiscard]] QString displayText(const QByteArray &bytes) const;
     [[nodiscard]] QString logLine(const TerminalEntry &entry) const;
+    [[nodiscard]] QString parserUnavailableText() const;
     void updateToolTips();
     void toggleLogging(bool enabled);
     void stopLogging(bool notify);
@@ -63,11 +87,15 @@ private:
     QToolButton *m_clearButton{};
     QTextEdit *m_terminal{};
     QTimer *m_flushTimer{};
-    QList<TerminalEntry> m_entries;
-    QList<TerminalEntry> m_pendingEntries;
+    QList<MonitorEntry> m_entries;
+    QList<MonitorEntry> m_pendingEntries;
     qsizetype m_entryBytes{};
     qsizetype m_pendingBytes{};
     QFile m_logFile;
     QByteArray m_pendingLog;
     TerminalDisplayMode m_displayMode{TerminalDisplayMode::Text};
+    ParserMode m_receiveMode{ParserMode::RawData};
+    std::map<ParserMode, std::shared_ptr<const CommunicationParser>> m_parsers;
+    bool m_emptyStateVisible{};
 };
+

@@ -3,6 +3,7 @@
 #include <QByteArray>
 #include <QObject>
 #include <QSettings>
+#include <QVariantMap>
 
 #include "models/AppTypes.h"
 #include "models/ConnectionTypes.h"
@@ -28,6 +29,7 @@ public:
     [[nodiscard]] TcpClientConfig tcpClientConfig() const;
     [[nodiscard]] VirtualDataConfig virtualDataConfig() const;
     [[nodiscard]] ParserMode parserMode() const noexcept;
+    [[nodiscard]] SendMode sendMode() const noexcept;
     [[nodiscard]] QString customProtocolId() const;
     [[nodiscard]] TerminalDisplayMode terminalDisplayMode() const noexcept;
     [[nodiscard]] bool terminalTimestampEnabled() const noexcept;
@@ -38,6 +40,10 @@ public:
     [[nodiscard]] InputMode inputMode() const noexcept;
     [[nodiscard]] ChecksumMode checksumMode() const noexcept;
     [[nodiscard]] LineEnding lineEnding() const noexcept;
+    [[nodiscard]] QString rawTextDraft() const;
+    [[nodiscard]] QString rawHexDraft() const;
+    [[nodiscard]] QString customCommandId() const;
+    [[nodiscard]] QVariantMap customFieldDrafts() const;
 
 public slots:
     void setThemeMode(ThemeMode mode);
@@ -53,6 +59,7 @@ public slots:
     void setTcpClientConfig(const TcpClientConfig &config);
     void setVirtualDataConfig(const VirtualDataConfig &config);
     void setParserMode(ParserMode mode);
+    void setSendMode(SendMode mode);
     void setCustomProtocolId(const QString &protocolId);
     void setTerminalDisplayMode(TerminalDisplayMode mode);
     void setTerminalTimestampEnabled(bool enabled);
@@ -63,6 +70,10 @@ public slots:
     void setInputMode(InputMode mode);
     void setChecksumMode(ChecksumMode mode);
     void setLineEnding(LineEnding ending);
+    void setRawTextDraft(const QString &draft);
+    void setRawHexDraft(const QString &draft);
+    void setCustomCommandId(const QString &commandId);
+    void setCustomFieldDrafts(const QVariantMap &drafts);
 
 private:
     void load();
@@ -81,6 +92,7 @@ private:
     TcpClientConfig m_tcpClientConfig;
     VirtualDataConfig m_virtualDataConfig;
     ParserMode m_parserMode{ParserMode::RawData};
+    SendMode m_sendMode{SendMode::RawData};
     QString m_customProtocolId;
     TerminalDisplayMode m_terminalDisplayMode{TerminalDisplayMode::Text};
     bool m_terminalTimestampEnabled{true};
@@ -91,4 +103,8 @@ private:
     InputMode m_inputMode{InputMode::Text};
     ChecksumMode m_checksumMode{ChecksumMode::None};
     LineEnding m_lineEnding{LineEnding::None};
+    QString m_rawTextDraft;
+    QString m_rawHexDraft;
+    QString m_customCommandId;
+    QVariantMap m_customFieldDrafts;
 };

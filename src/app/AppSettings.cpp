@@ -26,6 +26,7 @@ constexpr auto kVirtualAmplitudeKey = "connection/virtual/amplitude";
 constexpr auto kVirtualChannelsKey = "connection/virtual/channelCount";
 constexpr auto kParserModeKey = "connection/parser/mode";
 constexpr auto kCustomProtocolKey = "connection/parser/customProtocolId";
+constexpr auto kSendModeKey = "connection/send/mode";
 constexpr auto kTerminalDisplayKey = "connection/terminal/displayMode";
 constexpr auto kTimestampKey = "connection/terminal/timestamp";
 constexpr auto kEncodingKey = "connection/terminal/encoding";
@@ -35,6 +36,10 @@ constexpr auto kAnsiKey = "connection/terminal/ansi";
 constexpr auto kInputModeKey = "connection/send/inputMode";
 constexpr auto kChecksumModeKey = "connection/send/checksumMode";
 constexpr auto kLineEndingKey = "connection/send/lineEnding";
+constexpr auto kRawTextDraftKey = "connection/send/rawTextDraft";
+constexpr auto kRawHexDraftKey = "connection/send/rawHexDraft";
+constexpr auto kCustomCommandKey = "connection/send/customCommandId";
+constexpr auto kCustomFieldDraftsKey = "connection/send/customFieldDrafts";
 
 template<typename Enum>
 int enumValue(const Enum value)
@@ -114,6 +119,11 @@ ParserMode AppSettings::parserMode() const noexcept
     return m_parserMode;
 }
 
+SendMode AppSettings::sendMode() const noexcept
+{
+    return m_sendMode;
+}
+
 QString AppSettings::customProtocolId() const
 {
     return m_customProtocolId;
@@ -162,6 +172,26 @@ ChecksumMode AppSettings::checksumMode() const noexcept
 LineEnding AppSettings::lineEnding() const noexcept
 {
     return m_lineEnding;
+}
+
+QString AppSettings::rawTextDraft() const
+{
+    return m_rawTextDraft;
+}
+
+QString AppSettings::rawHexDraft() const
+{
+    return m_rawHexDraft;
+}
+
+QString AppSettings::customCommandId() const
+{
+    return m_customCommandId;
+}
+
+QVariantMap AppSettings::customFieldDrafts() const
+{
+    return m_customFieldDrafts;
 }
 
 void AppSettings::setThemeMode(const ThemeMode mode)
@@ -278,6 +308,13 @@ void AppSettings::setParserMode(const ParserMode mode)
     m_store.setValue(QLatin1String(kParserModeKey), enumValue(mode));
 }
 
+void AppSettings::setSendMode(const SendMode mode)
+{
+    if (m_sendMode == mode) return;
+    m_sendMode = mode;
+    m_store.setValue(QLatin1String(kSendModeKey), enumValue(mode));
+}
+
 void AppSettings::setCustomProtocolId(const QString &protocolId)
 {
     if (m_customProtocolId == protocolId) return;
@@ -346,6 +383,34 @@ void AppSettings::setLineEnding(const LineEnding ending)
     if (m_lineEnding == ending) return;
     m_lineEnding = ending;
     m_store.setValue(QLatin1String(kLineEndingKey), enumValue(ending));
+}
+
+void AppSettings::setRawTextDraft(const QString &draft)
+{
+    if (m_rawTextDraft == draft) return;
+    m_rawTextDraft = draft;
+    m_store.setValue(QLatin1String(kRawTextDraftKey), draft);
+}
+
+void AppSettings::setRawHexDraft(const QString &draft)
+{
+    if (m_rawHexDraft == draft) return;
+    m_rawHexDraft = draft;
+    m_store.setValue(QLatin1String(kRawHexDraftKey), draft);
+}
+
+void AppSettings::setCustomCommandId(const QString &commandId)
+{
+    if (m_customCommandId == commandId) return;
+    m_customCommandId = commandId;
+    m_store.setValue(QLatin1String(kCustomCommandKey), commandId);
+}
+
+void AppSettings::setCustomFieldDrafts(const QVariantMap &drafts)
+{
+    if (m_customFieldDrafts == drafts) return;
+    m_customFieldDrafts = drafts;
+    m_store.setValue(QLatin1String(kCustomFieldDraftsKey), drafts);
 }
 
 void AppSettings::load()
@@ -429,6 +494,11 @@ void AppSettings::load()
         m_store.value(QLatin1String(kParserModeKey),
                       enumValue(ParserMode::RawData)).toInt(),
         enumValue(ParserMode::CustomBinary)));
+    m_sendMode = static_cast<SendMode>(qBound(
+        enumValue(SendMode::RawData),
+        m_store.value(QLatin1String(kSendModeKey),
+                      enumValue(SendMode::RawData)).toInt(),
+        enumValue(SendMode::CustomBinary)));
     m_customProtocolId =
         m_store.value(QLatin1String(kCustomProtocolKey)).toString();
     m_terminalDisplayMode = static_cast<TerminalDisplayMode>(qBound(
@@ -463,4 +533,12 @@ void AppSettings::load()
         m_store.value(QLatin1String(kLineEndingKey),
                       enumValue(LineEnding::None)).toInt(),
         enumValue(LineEnding::CRLF)));
+    m_rawTextDraft =
+        m_store.value(QLatin1String(kRawTextDraftKey)).toString();
+    m_rawHexDraft =
+        m_store.value(QLatin1String(kRawHexDraftKey)).toString();
+    m_customCommandId =
+        m_store.value(QLatin1String(kCustomCommandKey)).toString();
+    m_customFieldDrafts =
+        m_store.value(QLatin1String(kCustomFieldDraftsKey)).toMap();
 }

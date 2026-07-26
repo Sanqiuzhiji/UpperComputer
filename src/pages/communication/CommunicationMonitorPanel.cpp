@@ -1,7 +1,8 @@
-#include "TerminalPanel.h"
+#include "CommunicationMonitorPanel.h"
 
 #include "app/AppContext.h"
 #include "app/AppSettings.h"
+#include "services/CommunicationCodec.h"
 #include "theme/IconManager.h"
 #include "widgets/FocusUnderline.h"
 
@@ -34,15 +35,16 @@ QColor ansiColor(const int color, const bool bright)
 }
 }
 
-TerminalPanel::TerminalPanel(AppContext *context, QWidget *parent)
+CommunicationMonitorPanel::CommunicationMonitorPanel(AppContext *context, QWidget *parent)
     : QFrame(parent),
       m_context(context),
       m_flushTimer(new QTimer(this)),
-      m_displayMode(context->settings()->terminalDisplayMode())
+      m_displayMode(context->settings()->terminalDisplayMode()),
+      m_receiveMode(context->settings()->parserMode())
 {
     setProperty("card", true);
-    setObjectName(QStringLiteral("terminalPanel"));
-    setMinimumHeight(220);
+    setObjectName(QStringLiteral("communicationMonitorPanel"));
+    setMinimumHeight(150);
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(10, 8, 10, 10);
     root->setSpacing(7);
@@ -101,7 +103,7 @@ TerminalPanel::TerminalPanel(AppContext *context, QWidget *parent)
     root->addLayout(toolbar);
 
     m_terminal = new QTextEdit(this);
-    m_terminal->setObjectName(QStringLiteral("connectionTerminal"));
+    m_terminal->setObjectName(QStringLiteral("communicationMonitorDisplay"));
     m_terminal->setReadOnly(true);
     m_terminal->setUndoRedoEnabled(false);
     m_terminal->setAcceptRichText(false);
@@ -111,7 +113,8 @@ TerminalPanel::TerminalPanel(AppContext *context, QWidget *parent)
     root->addWidget(m_terminal, 1);
 
     m_flushTimer->setInterval(33);
-    connect(m_flushTimer, &QTimer::timeout, this, &TerminalPanel::flushPending);
+    connect(m_flushTimer, &QTimer::timeout,
+            this, &CommunicationMonitorPanel::flushPending);
     m_flushTimer->start();
     connect(m_displayModeButton, &QToolButton::clicked, this, [this] {
         m_displayMode = m_displayMode == TerminalDisplayMode::Text
@@ -146,26 +149,28 @@ TerminalPanel::TerminalPanel(AppContext *context, QWidget *parent)
         renderAll();
     });
     connect(m_logButton, &QToolButton::toggled,
-            this, &TerminalPanel::toggleLogging);
+            this, &CommunicationMonitorPanel::toggleLogging);
     connect(m_clearButton, &QToolButton::clicked,
-            this, &TerminalPanel::clearEntries);
+            this, &CommunicationMonitorPanel::clearEntries);
     connect(context->iconManager(), &IconManager::iconsChanged,
-            this, &TerminalPanel::refreshIcons);
+            this, &CommunicationMonitorPanel::refreshIcons);
     refreshIcons();
     updateToolTips();
+    updateToolbarForMode();
+    showModeEmptyState();
 }
 
-TerminalPanel::~TerminalPanel()
+CommunicationMonitorPanel::~CommunicationMonitorPanel()
 {
     stopLogging(false);
 }
 
-TextEncoding TerminalPanel::textEncoding() const
+TextEncoding CommunicationMonitorPanel::textEncoding() const
 {
     return m_encodingCombo->currentData().value<TextEncoding>();
 }
 
-QString TerminalPanel::decode(const QByteArray &bytes) const
+QString CommunicationMonitorPanel::decode(const QByteArray &bytes) const
 {
     switch (textEncoding()) {
     case TextEncoding::Utf8: return QString::fromUtf8(bytes);
@@ -175,7 +180,34 @@ QString TerminalPanel::decode(const QByteArray &bytes) const
     return QString::fromUtf8(bytes);
 }
 
-void TerminalPanel::addEntry(
+ParserMode CommunicationMonitorPanel::receiveMode() const noexcept
+{
+    return m_receiveMode;
+}
+
+void CommunicationMonitorPanel::setParser(
+    const ParserMode mode,
+    std::shared_ptr<const CommunicationParser> parser)
+{
+    if (parser) {
+        m_parsers[mode] = std::move(parser);
+    } else {
+        m_parsers.erase(mode);
+    }
+    if (mode == m_receiveMode && m_entries.isEmpty()) {
+        showModeEmptyState();
+    }
+}
+
+void CommunicationMonitorPanel::setReceiveMode(const ParserMode mode)
+{
+    if (m_receiveMode == mode) return;
+    m_receiveMode = mode;
+    updateToolbarForMode();
+    clearEntries();
+}
+
+void CommunicationMonitorPanel::addEntry(
     const DataDirection direction, const QByteArray &bytes)
 {
     if (bytes.isEmpty()) return;
@@ -184,13 +216,38 @@ void TerminalPanel::addEntry(
         m_pendingLog += logLine(
             TerminalEntry{timestamp, direction, bytes}).toUtf8();
     }
-    TerminalEntry entry{
-        timestamp, direction,
-        bytes.size() > kMaximumBytes ? bytes.right(kMaximumBytes) : bytes};
-    m_entries.append(entry);
-    m_pendingEntries.append(entry);
-    m_entryBytes += entry.rawData.size();
-    m_pendingBytes += entry.rawData.size();
+
+    QList<MonitorEntry> additions;
+    const QByteArray bounded =
+        bytes.size() > kMaximumBytes ? bytes.right(kMaximumBytes) : bytes;
+    if (direction == DataDirection::Transmit
+        || m_receiveMode == ParserMode::RawData) {
+        additions.append(MonitorEntry{
+            timestamp, direction, bounded, {}, {}, false});
+    } else {
+        const auto parser = m_parsers.find(m_receiveMode);
+        if (parser == m_parsers.end() || !parser->second) return;
+        QList<ParsedMessage> messages;
+        QString error;
+        if (!parser->second->parse(bytes, &messages, &error)) {
+            emit notificationRequested(
+                error.isEmpty() ? tr("接收数据解析失败") : error,
+                NotificationType::Warning);
+            return;
+        }
+        for (const ParsedMessage &message : messages) {
+            additions.append(MonitorEntry{
+                timestamp, direction, bounded, message.displayName,
+                message.fields, true});
+        }
+    }
+
+    for (const MonitorEntry &entry : additions) {
+        m_entries.append(entry);
+        m_pendingEntries.append(entry);
+        m_entryBytes += entry.rawData.size();
+        m_pendingBytes += entry.rawData.size();
+    }
     while (m_entries.size() > kMaximumEntries
            || m_entryBytes > kMaximumBytes) {
         m_entryBytes -= m_entries.front().rawData.size();
@@ -203,16 +260,18 @@ void TerminalPanel::addEntry(
     }
 }
 
-void TerminalPanel::clearEntries()
+void CommunicationMonitorPanel::clearEntries()
 {
     m_entries.clear();
     m_pendingEntries.clear();
     m_entryBytes = 0;
     m_pendingBytes = 0;
     m_terminal->clear();
+    m_emptyStateVisible = false;
+    showModeEmptyState();
 }
 
-QToolButton *TerminalPanel::createToolButton(
+QToolButton *CommunicationMonitorPanel::createToolButton(
     const QString &text, const QString &toolTip, const QString &iconPath)
 {
     auto *button = new QToolButton(this);
@@ -226,7 +285,7 @@ QToolButton *TerminalPanel::createToolButton(
     return button;
 }
 
-void TerminalPanel::refreshIcons()
+void CommunicationMonitorPanel::refreshIcons()
 {
     m_displayModeButton->setIcon(m_context->iconManager()->icon(
         m_displayMode == TerminalDisplayMode::Hex
@@ -244,13 +303,17 @@ void TerminalPanel::refreshIcons()
     }
 }
 
-void TerminalPanel::flushPending()
+void CommunicationMonitorPanel::flushPending()
 {
     if (!m_pendingEntries.isEmpty()) {
-        const QList<TerminalEntry> batch = std::exchange(
-            m_pendingEntries, QList<TerminalEntry>{});
+        const QList<MonitorEntry> batch = std::exchange(
+            m_pendingEntries, QList<MonitorEntry>{});
         m_pendingBytes = 0;
-        for (const TerminalEntry &entry : batch) {
+        if (m_emptyStateVisible) {
+            m_terminal->clear();
+            m_emptyStateVisible = false;
+        }
+        for (const MonitorEntry &entry : batch) {
             if ((entry.direction == DataDirection::Receive
                  && !m_receiveButton->isChecked())
                 || (entry.direction == DataDirection::Transmit
@@ -273,12 +336,13 @@ void TerminalPanel::flushPending()
     }
 }
 
-void TerminalPanel::renderAll()
+void CommunicationMonitorPanel::renderAll()
 {
     m_pendingEntries.clear();
     m_pendingBytes = 0;
     m_terminal->clear();
-    for (const TerminalEntry &entry : std::as_const(m_entries)) {
+    m_emptyStateVisible = false;
+    for (const MonitorEntry &entry : std::as_const(m_entries)) {
         if ((entry.direction == DataDirection::Receive
              && !m_receiveButton->isChecked())
             || (entry.direction == DataDirection::Transmit
@@ -287,10 +351,11 @@ void TerminalPanel::renderAll()
         }
         appendEntry(entry);
     }
+    if (m_entries.isEmpty()) showModeEmptyState();
     m_terminal->moveCursor(QTextCursor::End);
 }
 
-void TerminalPanel::appendEntry(const TerminalEntry &entry)
+void CommunicationMonitorPanel::appendEntry(const MonitorEntry &entry)
 {
     QTextCursor cursor = m_terminal->textCursor();
     cursor.movePosition(QTextCursor::End);
@@ -307,15 +372,41 @@ void TerminalPanel::appendEntry(const TerminalEntry &entry)
         ? QStringLiteral("RX ") : QStringLiteral("TX ");
     cursor.insertText(prefix, prefixFormat);
     m_terminal->setTextCursor(cursor);
-    QString text = displayText(entry.rawData);
-    if (m_displayMode == TerminalDisplayMode::Text
-        && m_ansiButton->isChecked()) {
-        appendAnsiText(text);
-    } else {
-        static const QRegularExpression ansi(
-            QStringLiteral("\\x1B\\[[0-9;?]*[ -/]*[@-~]"));
+    if (entry.structured) {
+        QStringList fields;
+        for (qsizetype i = 0; i < entry.fields.size(); ++i) {
+            const ParsedField &field = entry.fields.at(i);
+            const QString name = field.displayName.trimmed().isEmpty()
+                ? QStringLiteral("data%1").arg(i + 1)
+                : field.displayName;
+            QString value = field.value.toString();
+            if (!field.unit.trimmed().isEmpty()) {
+                value += QStringLiteral(" ") + field.unit;
+            }
+            fields.append(QStringLiteral("%1: %2").arg(name, value));
+        }
+        const QString messageName = entry.messageName.trimmed();
+        const QString text = messageName.isEmpty()
+            ? fields.join(QStringLiteral("  |  "))
+            : QStringLiteral("%1  |  %2")
+                  .arg(messageName, fields.join(QStringLiteral("  |  ")));
         cursor = m_terminal->textCursor();
-        cursor.insertText(text.remove(ansi));
+        cursor.insertText(text);
+    } else {
+        QString text = m_receiveMode == ParserMode::RawData
+            ? displayText(entry.rawData)
+            : QStringLiteral("HEX: %1").arg(
+                  QString::fromLatin1(entry.rawData.toHex(' ').toUpper()));
+        if (m_receiveMode == ParserMode::RawData
+            && m_displayMode == TerminalDisplayMode::Text
+            && m_ansiButton->isChecked()) {
+            appendAnsiText(text);
+        } else {
+            static const QRegularExpression ansi(
+                QStringLiteral("\\x1B\\[[0-9;?]*[ -/]*[@-~]"));
+            cursor = m_terminal->textCursor();
+            cursor.insertText(text.remove(ansi));
+        }
     }
     cursor = m_terminal->textCursor();
     cursor.movePosition(QTextCursor::End);
@@ -323,7 +414,7 @@ void TerminalPanel::appendEntry(const TerminalEntry &entry)
     m_terminal->setTextCursor(cursor);
 }
 
-void TerminalPanel::appendAnsiText(const QString &text)
+void CommunicationMonitorPanel::appendAnsiText(const QString &text)
 {
     static const QRegularExpression controlSequence(
         QStringLiteral("\\x1B\\[([0-9;?]*)([ -/]*)([@-~])"));
@@ -347,7 +438,7 @@ void TerminalPanel::appendAnsiText(const QString &text)
     m_terminal->setTextCursor(cursor);
 }
 
-void TerminalPanel::applySgrCode(
+void CommunicationMonitorPanel::applySgrCode(
     const QString &codeText, QTextCharFormat *format) const
 {
     bool ok = false;
@@ -367,14 +458,53 @@ void TerminalPanel::applySgrCode(
     }
 }
 
-QString TerminalPanel::displayText(const QByteArray &bytes) const
+void CommunicationMonitorPanel::showModeEmptyState()
+{
+    if (!m_entries.isEmpty() || !m_pendingEntries.isEmpty()) return;
+    if (m_receiveMode == ParserMode::RawData) {
+        m_terminal->setPlaceholderText(
+            tr("接收和发送的原始数据将在这里显示"));
+        return;
+    }
+    m_terminal->setPlainText(parserUnavailableText());
+    m_terminal->moveCursor(QTextCursor::Start);
+    m_emptyStateVisible = true;
+}
+
+void CommunicationMonitorPanel::updateToolbarForMode()
+{
+    const bool raw = m_receiveMode == ParserMode::RawData;
+    m_displayModeButton->setVisible(raw);
+    m_encodingCombo->setVisible(raw);
+    m_ansiButton->setVisible(raw);
+}
+
+QString CommunicationMonitorPanel::displayText(const QByteArray &bytes) const
 {
     return m_displayMode == TerminalDisplayMode::Hex
         ? QString::fromLatin1(bytes.toHex(' ').toUpper())
         : decode(bytes);
 }
 
-QString TerminalPanel::logLine(const TerminalEntry &entry) const
+QString CommunicationMonitorPanel::parserUnavailableText() const
+{
+    if (m_parsers.contains(m_receiveMode)) {
+        return tr("等待解析后的字段数据");
+    }
+    switch (m_receiveMode) {
+    case ParserMode::RawData:
+        return {};
+    case ParserMode::FireWater:
+        return tr("FireWater 解析器尚未接入");
+    case ParserMode::JustFloat:
+        return tr("JustFloat 解析器尚未接入");
+    case ParserMode::CustomBinary:
+        return tr("CustomBinary 解析器尚未接入，请先选择并加载自定义协议");
+    }
+    return {};
+}
+
+QString CommunicationMonitorPanel::logLine(const TerminalEntry &entry) const
 {
     const QString direction = entry.direction == DataDirection::Receive
         ? QStringLiteral("RX") : QStringLiteral("TX");
@@ -388,7 +518,7 @@ QString TerminalPanel::logLine(const TerminalEntry &entry) const
              readable);
 }
 
-void TerminalPanel::updateToolTips()
+void CommunicationMonitorPanel::updateToolTips()
 {
     m_displayModeButton->setText(
         m_displayMode == TerminalDisplayMode::Hex
@@ -401,7 +531,7 @@ void TerminalPanel::updateToolTips()
         ? tr("停止通信日志记录") : tr("开始通信日志记录"));
 }
 
-void TerminalPanel::toggleLogging(const bool enabled)
+void CommunicationMonitorPanel::toggleLogging(const bool enabled)
 {
     if (!enabled) {
         stopLogging(true);
@@ -429,7 +559,7 @@ void TerminalPanel::toggleLogging(const bool enabled)
                                NotificationType::Success);
 }
 
-void TerminalPanel::stopLogging(const bool notify)
+void CommunicationMonitorPanel::stopLogging(const bool notify)
 {
     if (!m_logFile.isOpen()) {
         updateToolTips();

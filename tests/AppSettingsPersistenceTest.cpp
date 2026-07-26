@@ -32,6 +32,7 @@ int main(int argc, char *argv[])
         settings.setTcpClientConfig(client);
         settings.setVirtualDataConfig(virtualData);
         settings.setParserMode(ParserMode::CustomBinary);
+        settings.setSendMode(SendMode::CustomBinary);
         settings.setCustomProtocolId(QStringLiteral("protocol-id"));
         settings.setTerminalDisplayMode(TerminalDisplayMode::Hex);
         settings.setTerminalTimestampEnabled(false);
@@ -42,6 +43,11 @@ int main(int argc, char *argv[])
         settings.setInputMode(InputMode::Hex);
         settings.setChecksumMode(ChecksumMode::Crc8Maxim);
         settings.setLineEnding(LineEnding::CRLF);
+        settings.setRawTextDraft(QStringLiteral("text draft"));
+        settings.setRawHexDraft(QStringLiteral("AA 55"));
+        settings.setCustomCommandId(QStringLiteral("command-id"));
+        settings.setCustomFieldDrafts(
+            {{QStringLiteral("protocol/command/field"), 42}});
     }
     {
         AppSettings settings;
@@ -52,6 +58,7 @@ int main(int argc, char *argv[])
         if (settings.tcpClientConfig() != client) return 6;
         if (settings.virtualDataConfig() != virtualData) return 7;
         if (settings.parserMode() != ParserMode::CustomBinary
+            || settings.sendMode() != SendMode::CustomBinary
             || settings.customProtocolId() != QStringLiteral("protocol-id")) {
             return 8;
         }
@@ -66,6 +73,13 @@ int main(int argc, char *argv[])
             || settings.checksumMode() != ChecksumMode::Crc8Maxim
             || settings.lineEnding() != LineEnding::CRLF) {
             return 10;
+        }
+        if (settings.rawTextDraft() != QStringLiteral("text draft")
+            || settings.rawHexDraft() != QStringLiteral("AA 55")
+            || settings.customCommandId() != QStringLiteral("command-id")
+            || settings.customFieldDrafts().value(
+                   QStringLiteral("protocol/command/field")).toInt() != 42) {
+            return 11;
         }
     }
     return 0;

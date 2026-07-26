@@ -109,14 +109,16 @@ QString ThemeManager::styleSheet() const
             background: %4; border: 1px solid %5; border-radius: 5px;
             selection-background-color: #28A9E0;
         }
-        QLineEdit[invalid="true"] { border-color: #E5484D; }
+        QLineEdit[invalid="true"], QComboBox[invalid="true"],
+        QCheckBox[invalid="true"] { border-color: #E5484D; }
         QToolButton[terminalTool="true"]:checked {
             color: #28A9E0; background: %7; border-color: %5;
         }
-        QTextEdit#connectionTerminal {
+        QTextEdit#communicationMonitorDisplay {
             padding: 7px;
             font-family: "Cascadia Mono", "Consolas", "Microsoft YaHei UI";
         }
+        QStackedWidget#sendModeStack { background: transparent; }
         QHeaderView::section { background: %3; border: none; border-bottom: 1px solid %5; padding: 6px; }
         QSplitter::handle { background: %5; }
         QSplitter::handle:horizontal { width: 2px; }
