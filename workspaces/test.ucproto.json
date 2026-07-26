@@ -1,0 +1,50 @@
+{
+    "frames": [
+        {
+            "direction": "bidirectional",
+            "fields": [
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "AA",
+                    "id": "93dc34b9-907d-4614-8b11-3798b167dcea",
+                    "name": "header",
+                    "offset": 0,
+                    "role": "header",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "uint8",
+                    "fixedHex": "",
+                    "id": "1efa92dd-7ef7-403b-9178-fa92d9f888e6",
+                    "name": "data",
+                    "offset": 0,
+                    "role": "data",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "0D",
+                    "id": "abf3584a-3bae-4633-bc5a-00c9c99abffc",
+                    "name": "tail",
+                    "offset": 0,
+                    "role": "tail",
+                    "scale": 1
+                }
+            ],
+            "id": "f808bcfc-158b-4f39-8908-49608597e77a",
+            "name": "Motor"
+        }
+    ],
+    "id": "4edc6947-184a-4f11-ad01-75c66bd33581",
+    "name": "test",
+    "schemaVersion": 1
+}

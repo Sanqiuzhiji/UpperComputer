@@ -67,6 +67,34 @@ bool sameWorkspace(const Document &left, const Document &right)
     return normalizedLeft == right;
 }
 
+QString workspaceNameFromPath(const QString &filePath)
+{
+    QString fileName = QFileInfo(filePath).fileName();
+    constexpr auto workspaceSuffix = ".ucproto.json";
+    if (fileName.endsWith(
+            QLatin1String(workspaceSuffix),
+            Qt::CaseInsensitive)) {
+        fileName.chop(
+            static_cast<int>(
+                QLatin1String(workspaceSuffix).size()));
+    } else if (fileName.endsWith(
+                   QStringLiteral(".json"),
+                   Qt::CaseInsensitive)) {
+        fileName.chop(5);
+    }
+    return fileName;
+}
+
+bool sameFilePath(const QString &left, const QString &right)
+{
+#ifdef Q_OS_WIN
+    return QDir::cleanPath(left).compare(
+        QDir::cleanPath(right), Qt::CaseInsensitive) == 0;
+#else
+    return QDir::cleanPath(left) == QDir::cleanPath(right);
+#endif
+}
+
 } // namespace
 
 ProtocolRepository::ProtocolRepository(
@@ -228,7 +256,7 @@ bool ProtocolRepository::rescan(QStringList *errors)
         Document document;
         QString error;
         if (!loadFile(fileInfo.absoluteFilePath(), &document, &error)) {
-            const QString message = tr("协议文件“%1”加载失败：%2")
+            const QString message = tr("工作空间文件“%1”加载失败：%2")
                                         .arg(fileInfo.fileName(), error);
             if (errors) errors->append(message);
             emit notificationRequested(message, NotificationType::Error);
@@ -264,28 +292,26 @@ bool ProtocolRepository::save(
     QString *savedPath,
     QString *errorMessage)
 {
-    const QVector<ValidationIssue> issues = validate(document);
-    for (const ValidationIssue &issue : issues) {
-        if (issue.severity == ValidationSeverity::Error) {
-            if (errorMessage) *errorMessage = issue.message;
-            return false;
-        }
-    }
+    Document documentToSave = document;
+    const QString currentPath =
+        filePathForId(normalizedId(document.id));
+    const bool explicitTarget = !targetPath.trimmed().isEmpty();
     QString path = targetPath;
-    bool generatedPath = false;
-    if (path.trimmed().isEmpty()) {
-        path = filePathForId(normalizedId(document.id));
-    }
-    if (path.trimmed().isEmpty()) {
-        generatedPath = true;
-        path = QDir(m_directoryPath).filePath(
-            safeFileName(document.name) + QStringLiteral(".ucproto.json"));
+    if (!explicitTarget) {
+        const QString directory = currentPath.trimmed().isEmpty()
+            ? m_directoryPath
+            : QFileInfo(currentPath).absolutePath();
+        path = QDir(directory).filePath(
+            safeFileName(document.name)
+            + QStringLiteral(".ucproto.json"));
     }
     if (!path.endsWith(QStringLiteral(".ucproto.json"),
                        Qt::CaseInsensitive)) {
         path += QStringLiteral(".ucproto.json");
     }
-    if (generatedPath && QFileInfo::exists(path)) {
+    path = QFileInfo(path).absoluteFilePath();
+    if (QFileInfo::exists(path)
+        && !sameFilePath(path, currentPath)) {
         const QString basePath = path.left(
             path.size() - QStringLiteral(".ucproto.json").size());
         int suffix = 2;
@@ -294,6 +320,15 @@ bool ProtocolRepository::save(
                        .arg(basePath)
                        .arg(suffix++);
         } while (QFileInfo::exists(path));
+    }
+    documentToSave.name = workspaceNameFromPath(path);
+    const QVector<ValidationIssue> issues =
+        validate(documentToSave);
+    for (const ValidationIssue &issue : issues) {
+        if (issue.severity == ValidationSeverity::Error) {
+            if (errorMessage) *errorMessage = issue.message;
+            return false;
+        }
     }
     const QFileInfo fileInfo(path);
     if (!QDir().mkpath(fileInfo.absolutePath())) {
@@ -306,17 +341,27 @@ bool ProtocolRepository::save(
         if (errorMessage) *errorMessage = file.errorString();
         return false;
     }
-    const QJsonDocument json(toJson(document));
+    const QJsonDocument json(toJson(documentToSave));
     if (file.write(json.toJson(QJsonDocument::Indented)) < 0
         || !file.commit()) {
         if (errorMessage) *errorMessage = file.errorString();
         return false;
     }
-    upsertRecord(document, fileInfo.absoluteFilePath());
+    if (!explicitTarget && !currentPath.trimmed().isEmpty()
+        && !sameFilePath(
+            currentPath, fileInfo.absoluteFilePath())
+        && QFileInfo::exists(currentPath)
+        && !QFile::remove(currentPath)) {
+        emit notificationRequested(
+            tr("新文件已保存，但旧文件“%1”无法删除")
+                .arg(QFileInfo(currentPath).fileName()),
+            NotificationType::Warning);
+    }
+    upsertRecord(documentToSave, fileInfo.absoluteFilePath());
     if (savedPath) *savedPath = fileInfo.absoluteFilePath();
     emit protocolLibraryChanged();
     emit notificationRequested(
-        tr("协议“%1”已保存").arg(document.name),
+        tr("工作空间“%1”已保存").arg(documentToSave.name),
         NotificationType::Success);
     return true;
 }
@@ -333,7 +378,7 @@ bool ProtocolRepository::remove(
     const QString name = iterator->document.name;
     if (!QFile::remove(path)) {
         if (errorMessage) {
-            *errorMessage = tr("无法删除协议文件：%1").arg(path);
+            *errorMessage = tr("无法删除工作空间文件：%1").arg(path);
         }
         return false;
     }
@@ -413,8 +458,18 @@ QString ProtocolRepository::safeFileName(const QString &name)
     result.replace(
         QRegularExpression(QStringLiteral(R"([<>:"/\\|?*\x00-\x1F])")),
         QStringLiteral("_"));
+    result.replace(
+        QRegularExpression(QStringLiteral(R"([. ]+$)")),
+        QStringLiteral("_"));
     result = result.left(96);
-    return result.isEmpty() ? QStringLiteral("Protocol") : result;
+    if (QRegularExpression(
+            QStringLiteral(
+                R"(^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$)"),
+            QRegularExpression::CaseInsensitiveOption)
+            .match(result).hasMatch()) {
+        result.prepend(QLatin1Char('_'));
+    }
+    return result.isEmpty() ? QStringLiteral("Workspace") : result;
 }
 
 bool ProtocolRepository::loadFile(
@@ -439,7 +494,11 @@ bool ProtocolRepository::loadFile(
         }
         return false;
     }
-    return fromJson(json.object(), document, errorMessage);
+    if (!fromJson(json.object(), document, errorMessage)) {
+        return false;
+    }
+    document->name = workspaceNameFromPath(filePath);
+    return true;
 }
 
 void ProtocolRepository::upsertRecord(

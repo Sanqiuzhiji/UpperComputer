@@ -435,7 +435,7 @@ QVector<ValidationIssue> validate(const Document &document)
     if (document.name.trimmed().isEmpty()) {
         issues.append({
             ValidationSeverity::Error,
-            QStringLiteral("协议名称不能为空"), {}, {}});
+            QStringLiteral("工作空间名称不能为空"), {}, {}});
     }
 
     QSet<QString> frameNames;

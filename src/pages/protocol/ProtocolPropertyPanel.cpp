@@ -187,7 +187,7 @@ QWidget *ProtocolPropertyPanel::createDocumentPage()
     form->addRow(heading);
     m_documentName = new QLineEdit(page);
     m_documentName->setObjectName(QStringLiteral("protocolNameEditor"));
-    form->addRow(QStringLiteral("协议名称"), m_documentName);
+    form->addRow(QStringLiteral("工作空间名称"), m_documentName);
     m_documentFrameCount = new QLabel(page);
     form->addRow(QStringLiteral("协议帧数量"), m_documentFrameCount);
     m_documentByteCount = new QLabel(page);

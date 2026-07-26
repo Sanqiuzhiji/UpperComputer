@@ -1,7 +1,6 @@
 # CMake / IDE build output
 /cmake-build-*/
 /.codex-diagnostic-build*/
-/workspaces/
 /build/
 /out/
 

@@ -87,6 +87,20 @@ QString copiedName(const QString &name)
     return name + QStringLiteral("_copy");
 }
 
+QString workspaceNameFromPath(const QString &filePath)
+{
+    QString fileName = QFileInfo(filePath).fileName();
+    constexpr auto workspaceSuffix = ".ucproto.json";
+    if (fileName.endsWith(
+            QLatin1String(workspaceSuffix),
+            Qt::CaseInsensitive)) {
+        fileName.chop(
+            static_cast<int>(
+                QLatin1String(workspaceSuffix).size()));
+    }
+    return fileName;
+}
+
 } // namespace
 
 ProtocolEditorPage::ProtocolEditorPage(
@@ -156,7 +170,7 @@ void ProtocolEditorPage::createUi()
     auto *topLayout = new QHBoxLayout(topBar);
     topLayout->setContentsMargins(10, 7, 10, 7);
     topLayout->setSpacing(4);
-    auto *label = new QLabel(QStringLiteral("协议文件"), topBar);
+    auto *label = new QLabel(QStringLiteral("工作空间"), topBar);
     label->setProperty("muted", true);
     topLayout->addWidget(label);
     m_protocolCombo = new QComboBox(topBar);
@@ -501,7 +515,7 @@ bool ProtocolEditorPage::saveDocument(const bool saveAs)
     if (saveAs) {
         documentToSave.id = QUuid::createUuid();
     }
-    QString target = saveAs ? QString{} : m_filePath;
+    QString target;
     if (saveAs) {
         target = QFileDialog::getSaveFileName(
             this,
@@ -520,8 +534,10 @@ bool ProtocolEditorPage::saveDocument(const bool saveAs)
             NotificationType::Error);
         return false;
     }
+    documentToSave.name =
+        workspaceNameFromPath(savedPath);
+    m_document = documentToSave;
     if (saveAs) {
-        m_document = documentToSave;
         m_undoStack->clear();
     }
     m_filePath = savedPath;
@@ -882,7 +898,7 @@ void ProtocolEditorPage::updateDocumentName(const QString &name)
     Document after = m_document;
     after.name = name;
     applyDocumentChange(
-        after, QStringLiteral("修改协议名称"), {}, {});
+        after, QStringLiteral("修改工作空间名称"), {}, {});
 }
 
 void ProtocolEditorPage::updateFrame(const Frame &frame)
