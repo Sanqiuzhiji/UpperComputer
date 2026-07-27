@@ -8,6 +8,7 @@
 #include "theme/ThemeManager.h"
 
 #include <QApplication>
+#include <QColor>
 #include <QComboBox>
 #include <QEventLoop>
 #include <QLineEdit>
@@ -16,7 +17,9 @@
 #include <QSettings>
 #include <QStackedWidget>
 #include <QTemporaryDir>
+#include <QTextBlock>
 #include <QTextEdit>
+#include <QTextFragment>
 #include <QTimer>
 #include <QToolButton>
 
@@ -37,6 +40,44 @@ bool selectComboData(QComboBox *combo, const QVariant &value)
     combo->setCurrentIndex(index);
     QCoreApplication::processEvents();
     return true;
+}
+
+bool hasDirectionBadge(
+    const QTextEdit *display, const QString &label, const QColor &background)
+{
+    for (QTextBlock block = display->document()->begin();
+         block.isValid();
+         block = block.next()) {
+        for (auto it = block.begin(); !it.atEnd(); ++it) {
+            const QTextFragment fragment = it.fragment();
+            if (fragment.isValid()
+                && fragment.text().contains(label)
+                && fragment.charFormat().background().color() == background) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool hasDirectionText(
+    const QTextEdit *display, const QString &text, const QColor &foreground)
+{
+    for (QTextBlock block = display->document()->begin();
+         block.isValid();
+         block = block.next()) {
+        for (auto it = block.begin(); !it.atEnd(); ++it) {
+            const QTextFragment fragment = it.fragment();
+            const QTextCharFormat format = fragment.charFormat();
+            if (fragment.isValid()
+                && fragment.text().contains(text)
+                && format.foreground().color() == foreground
+                && format.background().style() == Qt::NoBrush) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 ProtocolDefinition testProtocol()
@@ -333,9 +374,19 @@ int main(int argc, char *argv[])
     monitor->addEntry(DataDirection::Receive, lastPayload);
     waitForEvents(30);
     const QString customBinaryDisplay = display->toPlainText();
-    if (!customBinaryDisplay.contains(QStringLiteral("[RX] Set values"))
+    if (!customBinaryDisplay.contains(QStringLiteral("RX  Set values"))
         || !customBinaryDisplay.contains(
-            QStringLiteral("[TX] HEX: AA 55 08 19 00 0A 2A 0D"))
+            QStringLiteral("TX  HEX: AA 55 08 19 00 0A 2A 0D"))
+        || !hasDirectionBadge(
+            display, QStringLiteral("RX"), QColor(QStringLiteral("#45B97C")))
+        || !hasDirectionBadge(
+            display, QStringLiteral("TX"), QColor(QStringLiteral("#28A9E0")))
+        || !hasDirectionText(
+            display, QStringLiteral("Set values"),
+            QColor(QStringLiteral("#45B97C")))
+        || !hasDirectionText(
+            display, QStringLiteral("HEX: AA 55"),
+            QColor(QStringLiteral("#28A9E0")))
         || !display->toPlainText().contains(QStringLiteral("Signed value"))
         || !display->toPlainText().contains(QStringLiteral("25"))
         || customBinaryDisplay.contains(QStringLiteral("Header:"))

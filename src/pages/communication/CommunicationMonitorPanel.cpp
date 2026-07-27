@@ -359,18 +359,25 @@ void CommunicationMonitorPanel::appendEntry(const MonitorEntry &entry)
 {
     QTextCursor cursor = m_terminal->textCursor();
     cursor.movePosition(QTextCursor::End);
-    QTextCharFormat prefixFormat;
-    prefixFormat.setForeground(entry.direction == DataDirection::Receive
+    const QColor directionColor = entry.direction == DataDirection::Receive
         ? QColor(QStringLiteral("#45B97C"))
-        : m_context->themeManager()->accentColor());
-    QString prefix;
+        : m_context->themeManager()->accentColor();
+    QTextCharFormat lineFormat;
+    lineFormat.setForeground(directionColor);
+
     if (m_timestampButton->isChecked()) {
-        prefix += QStringLiteral("[%1] ")
-            .arg(entry.timestamp.toString(QStringLiteral("HH:mm:ss.zzz")));
+        cursor.insertText(QStringLiteral("[%1] ").arg(
+            entry.timestamp.toString(QStringLiteral("HH:mm:ss.zzz"))),
+            lineFormat);
     }
-    prefix += entry.direction == DataDirection::Receive
-        ? QStringLiteral("[RX] ") : QStringLiteral("[TX] ");
-    cursor.insertText(prefix, prefixFormat);
+
+    QTextCharFormat directionFormat;
+    directionFormat.setBackground(directionColor);
+    directionFormat.setForeground(QColor(QStringLiteral("#101418")));
+    directionFormat.setFontWeight(QFont::DemiBold);
+    cursor.insertText(entry.direction == DataDirection::Receive
+        ? QStringLiteral(" RX ") : QStringLiteral(" TX "), directionFormat);
+    cursor.insertText(QStringLiteral(" "), lineFormat);
     m_terminal->setTextCursor(cursor);
     if (entry.structured) {
         QStringList fields;
@@ -395,7 +402,7 @@ void CommunicationMonitorPanel::appendEntry(const MonitorEntry &entry)
             : QStringLiteral("%1  |  %2")
                   .arg(messageName, fields.join(QStringLiteral("  |  ")));
         cursor = m_terminal->textCursor();
-        cursor.insertText(text);
+        cursor.insertText(text, lineFormat);
     } else {
         QString text = m_receiveMode == ParserMode::RawData
             ? displayText(entry.rawData)
@@ -404,26 +411,27 @@ void CommunicationMonitorPanel::appendEntry(const MonitorEntry &entry)
         if (m_receiveMode == ParserMode::RawData
             && m_displayMode == TerminalDisplayMode::Text
             && m_ansiButton->isChecked()) {
-            appendAnsiText(text);
+            appendAnsiText(text, lineFormat);
         } else {
             static const QRegularExpression ansi(
                 QStringLiteral("\\x1B\\[[0-9;?]*[ -/]*[@-~]"));
             cursor = m_terminal->textCursor();
-            cursor.insertText(text.remove(ansi));
+            cursor.insertText(text.remove(ansi), lineFormat);
         }
     }
     cursor = m_terminal->textCursor();
     cursor.movePosition(QTextCursor::End);
-    cursor.insertText(QStringLiteral("\n"));
+    cursor.insertText(QStringLiteral("\n"), QTextCharFormat());
     m_terminal->setTextCursor(cursor);
 }
 
-void CommunicationMonitorPanel::appendAnsiText(const QString &text)
+void CommunicationMonitorPanel::appendAnsiText(
+    const QString &text, const QTextCharFormat &baseFormat)
 {
     static const QRegularExpression controlSequence(
         QStringLiteral("\\x1B\\[([0-9;?]*)([ -/]*)([@-~])"));
     QTextCursor cursor = m_terminal->textCursor();
-    QTextCharFormat format;
+    QTextCharFormat format = baseFormat;
     qsizetype offset = 0;
     auto matchIterator = controlSequence.globalMatch(text);
     while (matchIterator.hasNext()) {
@@ -433,7 +441,9 @@ void CommunicationMonitorPanel::appendAnsiText(const QString &text)
             const QStringList codes = match.captured(1).isEmpty()
                 ? QStringList{QStringLiteral("0")}
                 : match.captured(1).split(u';');
-            for (const QString &code : codes) applySgrCode(code, &format);
+            for (const QString &code : codes) {
+                applySgrCode(code, baseFormat, &format);
+            }
         }
         // Unsupported control sequences are consumed without executing them.
         offset = match.capturedEnd();
@@ -443,12 +453,14 @@ void CommunicationMonitorPanel::appendAnsiText(const QString &text)
 }
 
 void CommunicationMonitorPanel::applySgrCode(
-    const QString &codeText, QTextCharFormat *format) const
+    const QString &codeText,
+    const QTextCharFormat &baseFormat,
+    QTextCharFormat *format) const
 {
     bool ok = false;
     const int code = codeText.toInt(&ok);
     if (!ok || code == 0) {
-        *format = QTextCharFormat();
+        *format = baseFormat;
     } else if (code == 1) {
         format->setFontWeight(QFont::Bold);
     } else if (code == 22) {
@@ -458,7 +470,7 @@ void CommunicationMonitorPanel::applySgrCode(
     } else if (code >= 90 && code <= 97) {
         format->setForeground(ansiColor(code - 90, true));
     } else if (code == 39) {
-        format->clearForeground();
+        format->setForeground(baseFormat.foreground());
     }
 }
 

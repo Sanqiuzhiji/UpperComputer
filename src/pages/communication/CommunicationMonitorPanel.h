@@ -62,8 +62,12 @@ private:
     void flushPending();
     void renderAll();
     void appendEntry(const MonitorEntry &entry);
-    void appendAnsiText(const QString &text);
-    void applySgrCode(const QString &code, QTextCharFormat *format) const;
+    void appendAnsiText(
+        const QString &text, const QTextCharFormat &baseFormat);
+    void applySgrCode(
+        const QString &code,
+        const QTextCharFormat &baseFormat,
+        QTextCharFormat *format) const;
     void showModeEmptyState();
     void updateToolbarForMode();
     [[nodiscard]] QString displayText(const QByteArray &bytes) const;
@@ -98,4 +102,3 @@ private:
     std::map<ParserMode, std::shared_ptr<const CommunicationParser>> m_parsers;
     bool m_emptyStateVisible{};
 };
-
