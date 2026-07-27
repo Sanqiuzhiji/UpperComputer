@@ -6,6 +6,7 @@
 #include <QLineEdit>
 #include <QMouseEvent>
 #include <QSet>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QToolButton>
@@ -141,14 +142,24 @@ void testRepository()
         importedLabels.insert(summary.displayName);
     }
     verify(
-        imported.size() == 3
-            && importedLabels.size() == imported.size(),
-        "same-name imports have distinct protocol picker labels");
+        imported.size() == 2
+            && importedLabels.size() == imported.size()
+            && firstImportedId == secondImportedId,
+        "duplicate imports reuse the stable workspace record");
 }
 
 void testPage()
 {
     QStandardPaths::setTestModeEnabled(true);
+    QTemporaryDir workspaceDirectory;
+    verify(
+        workspaceDirectory.isValid(),
+        "temporary page workspace directory exists");
+    QSettings settings;
+    settings.setValue(
+        QStringLiteral("workspace/directory"),
+        workspaceDirectory.path());
+    settings.sync();
     AppContext context;
     ProtocolEditorPage page(&context);
     page.resize(960, 640);
@@ -403,6 +414,12 @@ int main(int argc, char **argv)
     QApplication application(argc, argv);
     QApplication::setApplicationName(QStringLiteral("ProtocolEditorTest"));
     QApplication::setOrganizationName(QStringLiteral("UpperComputerTests"));
+    QTemporaryDir settingsDirectory;
+    if (!settingsDirectory.isValid()) return 1;
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(
+        QSettings::IniFormat, QSettings::UserScope,
+        settingsDirectory.path());
 
     testModelAndJson();
     testRepository();

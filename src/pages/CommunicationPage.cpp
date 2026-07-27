@@ -8,6 +8,7 @@
 #include "services/ConnectionManager.h"
 #include "services/CustomBinaryCodec.h"
 #include "services/ProtocolRepository.h"
+#include "services/ReceiveDataPipeline.h"
 
 #include <QSplitter>
 #include <QVBoxLayout>
@@ -66,9 +67,19 @@ CommunicationPage::CommunicationPage(
             m_hardwarePanel, &HardwareConfigPanel::setConnectionState);
     connect(manager, &ConnectionManager::tcpClientsChanged,
             m_hardwarePanel, &HardwareConfigPanel::setTcpClients);
-    connect(manager, &ConnectionManager::dataReceived, this,
-            [this](const QByteArray &bytes) {
-                m_monitorPanel->addEntry(DataDirection::Receive, bytes);
+    ReceiveDataPipeline *pipeline = context->receiveDataPipeline();
+    connect(pipeline, &ReceiveDataPipeline::rawDataReceived,
+            m_monitorPanel, &CommunicationMonitorPanel::addReceivedData);
+    connect(pipeline, &ReceiveDataPipeline::parsedMessagesReceived,
+            this, [this](
+                const qint64 timestampUs,
+                const QString &,
+                const QList<ParsedMessage> &messages) {
+                m_monitorPanel->addParsedMessages(timestampUs, messages);
+            });
+    connect(pipeline, &ReceiveDataPipeline::parseFailed,
+            this, [this](const QString &message) {
+                notify(message, NotificationType::Warning);
             });
     connect(manager, &ConnectionManager::dataSent, this,
             [this](const QByteArray &bytes) {
@@ -123,6 +134,7 @@ CommunicationPage::CommunicationPage(
     connect(m_modePanel, &CommunicationModePanel::receiveModeChanged,
             this, [this](const ParserMode mode) {
                 m_monitorPanel->setReceiveMode(mode);
+                m_context->receiveDataPipeline()->setParserMode(mode);
                 emit receiveModeChanged(mode);
                 notify(tr("接收解析模式已切换，当前显示内容已清空"),
                        NotificationType::Information);
@@ -139,14 +151,11 @@ CommunicationPage::CommunicationPage(
     connect(m_modePanel, &CommunicationModePanel::customProtocolChanged,
             this, [this](const QString &protocolId) {
                 m_sendPanel->setCurrentProtocolId(protocolId);
-                installCustomBinaryParser(protocolId);
+                updateReceivePipeline();
                 emit customProtocolChanged(protocolId);
             });
     connect(m_modePanel, &CommunicationModePanel::receiveCommandChanged,
-            this, [this](const QString &) {
-                installCustomBinaryParser(
-                    m_modePanel->currentProtocolId());
-            });
+            this, [this](const QString &) { updateReceivePipeline(); });
     connect(m_modePanel, &CommunicationModePanel::sendCommandChanged,
             m_sendPanel, &SendPanel::setCurrentCommandId);
     connect(m_modePanel, &CommunicationModePanel::requestProtocolLibrary,
@@ -168,14 +177,7 @@ void CommunicationPage::setProtocols(
     m_sendPanel->setCurrentProtocolId(m_modePanel->currentProtocolId());
     m_sendPanel->setCurrentCommandId(
         m_modePanel->currentSendCommandId());
-    installCustomBinaryParser(m_modePanel->currentProtocolId());
-}
-
-void CommunicationPage::setReceiveParser(
-    const ParserMode mode,
-    std::shared_ptr<const CommunicationParser> parser)
-{
-    m_monitorPanel->setParser(mode, std::move(parser));
+    updateReceivePipeline();
 }
 
 void CommunicationPage::setCustomBinaryEncoder(
@@ -185,32 +187,11 @@ void CommunicationPage::setCustomBinaryEncoder(
     m_sendPanel->setEncoder(protocolId, std::move(encoder));
 }
 
-void CommunicationPage::installCustomBinaryParser(
-    const QString &protocolId)
+void CommunicationPage::updateReceivePipeline()
 {
-    for (const ProtocolDefinition &protocol : m_protocols) {
-        if (protocol.id != protocolId) continue;
-        ProtocolDefinition selected = protocol;
-        const QString receiveCommandId =
-            m_modePanel->currentReceiveCommandId();
-        selected.receiveMessages.erase(
-            std::remove_if(
-                selected.receiveMessages.begin(),
-                selected.receiveMessages.end(),
-                [&receiveCommandId](
-                    const MessageDefinition &message) {
-                    return message.id != receiveCommandId;
-                }),
-            selected.receiveMessages.end());
-        m_monitorPanel->setParser(
-            ParserMode::CustomBinary,
-            std::make_shared<CustomBinaryCodec>(
-                std::move(selected)));
-        return;
-    }
-    m_monitorPanel->setParser(
-        ParserMode::CustomBinary,
-        std::shared_ptr<const CommunicationParser>{});
+    m_context->receiveDataPipeline()->setCustomProtocol(
+        m_modePanel->currentProtocolId(),
+        m_modePanel->currentReceiveCommandId());
 }
 
 void CommunicationPage::notify(

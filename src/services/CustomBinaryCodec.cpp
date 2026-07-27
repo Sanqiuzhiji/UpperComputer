@@ -311,6 +311,7 @@ bool decodeMessage(
 {
     const int totalSize = messageByteCount(message);
     if (frame.size() != totalSize) return false;
+    parsed->messageId = message.id;
     parsed->displayName = message.displayName.trimmed().isEmpty()
         ? message.id : message.displayName;
     parsed->fields.clear();
@@ -349,6 +350,7 @@ bool decodeMessage(
 
         parsed->fields.append(
             ParsedField{
+                field.id,
                 fieldName(field, index),
                 decodeValue(field, bytes),
                 field.unit,

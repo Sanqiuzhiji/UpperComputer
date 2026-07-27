@@ -72,6 +72,7 @@ struct ProtocolDefinition {
 };
 
 struct ParsedField {
+    QString fieldId;
     QString displayName;
     QVariant value;
     QString unit;
@@ -79,6 +80,7 @@ struct ParsedField {
 };
 
 struct ParsedMessage {
+    QString messageId;
     QString displayName;
     QList<ParsedField> fields;
 };
@@ -88,3 +90,6 @@ using ProtocolFieldValues = QHash<QString, QVariant>;
 Q_DECLARE_METATYPE(ProtocolFieldType)
 Q_DECLARE_METATYPE(ProtocolFieldRole)
 Q_DECLARE_METATYPE(ProtocolChecksumAlgorithm)
+Q_DECLARE_METATYPE(ParsedField)
+Q_DECLARE_METATYPE(ParsedMessage)
+Q_DECLARE_METATYPE(QList<ParsedMessage>)

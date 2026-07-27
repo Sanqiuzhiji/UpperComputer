@@ -6,9 +6,11 @@
 #include "models/AppTypes.h"
 
 class AppSettings;
+class ChannelDataHub;
 class ConnectionManager;
 class IconManager;
 class ProtocolRepository;
+class ReceiveDataPipeline;
 class ThemeManager;
 
 class AppContext final : public QObject
@@ -23,6 +25,8 @@ public:
     [[nodiscard]] ThemeManager *themeManager() const noexcept;
     [[nodiscard]] IconManager *iconManager() const noexcept;
     [[nodiscard]] ProtocolRepository *protocolRepository() const noexcept;
+    [[nodiscard]] ChannelDataHub *channelDataHub() const noexcept;
+    [[nodiscard]] ReceiveDataPipeline *receiveDataPipeline() const noexcept;
 
     void notify(const QString &message,
                 NotificationType type = NotificationType::Information);
@@ -33,7 +37,9 @@ signals:
 private:
     AppSettings *m_settings{};
     ConnectionManager *m_connectionManager{};
+    ProtocolRepository *m_protocolRepository{};
+    ChannelDataHub *m_channelDataHub{};
+    ReceiveDataPipeline *m_receiveDataPipeline{};
     ThemeManager *m_themeManager{};
     IconManager *m_iconManager{};
-    ProtocolRepository *m_protocolRepository{};
 };

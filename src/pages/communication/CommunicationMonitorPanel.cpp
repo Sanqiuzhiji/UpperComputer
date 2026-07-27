@@ -2,7 +2,6 @@
 
 #include "app/AppContext.h"
 #include "app/AppSettings.h"
-#include "services/CommunicationCodec.h"
 #include "theme/IconManager.h"
 #include "widgets/FocusUnderline.h"
 
@@ -185,20 +184,6 @@ ParserMode CommunicationMonitorPanel::receiveMode() const noexcept
     return m_receiveMode;
 }
 
-void CommunicationMonitorPanel::setParser(
-    const ParserMode mode,
-    std::shared_ptr<const CommunicationParser> parser)
-{
-    if (parser) {
-        m_parsers[mode] = std::move(parser);
-    } else {
-        m_parsers.erase(mode);
-    }
-    if (mode == m_receiveMode && m_entries.isEmpty()) {
-        showModeEmptyState();
-    }
-}
-
 void CommunicationMonitorPanel::setReceiveMode(const ParserMode mode)
 {
     if (m_receiveMode == mode) return;
@@ -211,43 +196,27 @@ void CommunicationMonitorPanel::addEntry(
     const DataDirection direction, const QByteArray &bytes)
 {
     if (bytes.isEmpty()) return;
-    const QDateTime timestamp = QDateTime::currentDateTime();
+    const qint64 timestampUs =
+        QDateTime::currentMSecsSinceEpoch() * 1000;
+    if (direction == DataDirection::Receive) {
+        addReceivedData(timestampUs, bytes);
+        return;
+    }
+    const QDateTime timestamp =
+        QDateTime::fromMSecsSinceEpoch(timestampUs / 1000);
     if (m_logFile.isOpen()) {
         m_pendingLog += logLine(
             TerminalEntry{timestamp, direction, bytes}).toUtf8();
     }
 
-    QList<MonitorEntry> additions;
     const QByteArray bounded =
         bytes.size() > kMaximumBytes ? bytes.right(kMaximumBytes) : bytes;
-    if (direction == DataDirection::Transmit
-        || m_receiveMode == ParserMode::RawData) {
-        additions.append(MonitorEntry{
-            timestamp, direction, bounded, {}, {}, false});
-    } else {
-        const auto parser = m_parsers.find(m_receiveMode);
-        if (parser == m_parsers.end() || !parser->second) return;
-        QList<ParsedMessage> messages;
-        QString error;
-        if (!parser->second->parse(bytes, &messages, &error)) {
-            emit notificationRequested(
-                error.isEmpty() ? tr("接收数据解析失败") : error,
-                NotificationType::Warning);
-            return;
-        }
-        for (const ParsedMessage &message : messages) {
-            additions.append(MonitorEntry{
-                timestamp, direction, bounded, message.displayName,
-                message.fields, true});
-        }
-    }
-
-    for (const MonitorEntry &entry : additions) {
-        m_entries.append(entry);
-        m_pendingEntries.append(entry);
-        m_entryBytes += entry.rawData.size();
-        m_pendingBytes += entry.rawData.size();
-    }
+    const MonitorEntry entry{
+        timestamp, direction, bounded, {}, {}, false};
+    m_entries.append(entry);
+    m_pendingEntries.append(entry);
+    m_entryBytes += entry.rawData.size();
+    m_pendingBytes += entry.rawData.size();
     while (m_entries.size() > kMaximumEntries
            || m_entryBytes > kMaximumBytes) {
         m_entryBytes -= m_entries.front().rawData.size();
@@ -255,6 +224,65 @@ void CommunicationMonitorPanel::addEntry(
     }
     while (m_pendingEntries.size() > kMaximumEntries
            || m_pendingBytes > kMaximumBytes) {
+        m_pendingBytes -= m_pendingEntries.front().rawData.size();
+        m_pendingEntries.removeFirst();
+    }
+}
+
+void CommunicationMonitorPanel::addReceivedData(
+    const qint64 timestampUs, const QByteArray &bytes)
+{
+    if (bytes.isEmpty()) return;
+    const QDateTime timestamp =
+        QDateTime::fromMSecsSinceEpoch(timestampUs / 1000);
+    if (m_logFile.isOpen()) {
+        m_pendingLog += logLine(TerminalEntry{
+            timestamp, DataDirection::Receive, bytes}).toUtf8();
+    }
+    if (m_receiveMode != ParserMode::RawData) return;
+    const QByteArray bounded =
+        bytes.size() > kMaximumBytes ? bytes.right(kMaximumBytes) : bytes;
+    const MonitorEntry entry{
+        timestamp, DataDirection::Receive, bounded, {}, {}, false};
+    m_entries.append(entry);
+    m_pendingEntries.append(entry);
+    m_entryBytes += bounded.size();
+    m_pendingBytes += bounded.size();
+    while (m_entries.size() > kMaximumEntries
+           || m_entryBytes > kMaximumBytes) {
+        m_entryBytes -= m_entries.front().rawData.size();
+        m_entries.removeFirst();
+    }
+    while (m_pendingEntries.size() > kMaximumEntries
+           || m_pendingBytes > kMaximumBytes) {
+        m_pendingBytes -= m_pendingEntries.front().rawData.size();
+        m_pendingEntries.removeFirst();
+    }
+}
+
+void CommunicationMonitorPanel::addParsedMessages(
+    const qint64 timestampUs, const QList<ParsedMessage> &messages)
+{
+    if (m_receiveMode == ParserMode::RawData) return;
+    const QDateTime timestamp =
+        QDateTime::fromMSecsSinceEpoch(timestampUs / 1000);
+    for (const ParsedMessage &message : messages) {
+        const MonitorEntry entry{
+            timestamp,
+            DataDirection::Receive,
+            {},
+            message.displayName,
+            message.fields,
+            true
+        };
+        m_entries.append(entry);
+        m_pendingEntries.append(entry);
+    }
+    while (m_entries.size() > kMaximumEntries) {
+        m_entryBytes -= m_entries.front().rawData.size();
+        m_entries.removeFirst();
+    }
+    while (m_pendingEntries.size() > kMaximumEntries) {
         m_pendingBytes -= m_pendingEntries.front().rawData.size();
         m_pendingEntries.removeFirst();
     }
@@ -504,7 +532,7 @@ QString CommunicationMonitorPanel::displayText(const QByteArray &bytes) const
 
 QString CommunicationMonitorPanel::parserUnavailableText() const
 {
-    if (m_parsers.contains(m_receiveMode)) {
+    if (m_receiveMode == ParserMode::CustomBinary) {
         return tr("等待解析后的字段数据");
     }
     switch (m_receiveMode) {

@@ -22,6 +22,37 @@ find_package(Qt6 6.11 REQUIRED COMPONENTS
     SerialPort
 )
 
+set(TELEMETRY_SOURCES
+    src/models/TelemetryTypes.h
+    src/services/ChannelDataHub.h
+    src/services/ChannelDataHub.cpp
+    src/services/ReceiveDataPipeline.h
+    src/services/ReceiveDataPipeline.cpp
+)
+
+set(PLOT_SOURCES
+    src/pages/plot/PlotTypes.h
+    src/pages/plot/PlotTheme.h
+    src/pages/plot/PlotToolBar.h
+    src/pages/plot/PlotToolBar.cpp
+    src/pages/plot/DetachableTabBar.h
+    src/pages/plot/DetachableTabBar.cpp
+    src/pages/plot/DetachableTabWidget.h
+    src/pages/plot/DetachableTabWidget.cpp
+    src/pages/plot/PlotFloatingWindow.h
+    src/pages/plot/PlotFloatingWindow.cpp
+    src/pages/plot/PlotWorkspacePage.h
+    src/pages/plot/PlotWorkspacePage.cpp
+    src/pages/plot/PlotCanvas.h
+    src/pages/plot/PlotCanvas.cpp
+    src/pages/plot/DashboardItem.h
+    src/pages/plot/DashboardItem.cpp
+    src/pages/plot/RealtimePlotWidget.h
+    src/pages/plot/RealtimePlotWidget.cpp
+    src/pages/plot/PlotChannelDialog.h
+    src/pages/plot/PlotChannelDialog.cpp
+)
+
 qt_add_executable(UpperComputer WIN32
     main.cpp
     resources/resources.qrc
@@ -41,6 +72,7 @@ qt_add_executable(UpperComputer WIN32
     src/services/CustomBinaryCodec.cpp
     src/services/ProtocolRepository.h
     src/services/ProtocolRepository.cpp
+    ${TELEMETRY_SOURCES}
     src/services/transports/AbstractTransport.h
     src/services/transports/AbstractTransport.cpp
     src/services/transports/SerialTransport.h
@@ -58,6 +90,7 @@ qt_add_executable(UpperComputer WIN32
     src/pages/PageRegistry.cpp
     src/pages/PlotPage.h
     src/pages/PlotPage.cpp
+    ${PLOT_SOURCES}
     src/pages/CommunicationPage.h
     src/pages/CommunicationPage.cpp
     src/pages/communication/HardwareConfigPanel.h
@@ -212,6 +245,7 @@ if(BUILD_TESTING)
         src/services/CustomBinaryCodec.cpp
         src/services/ProtocolRepository.h
         src/services/ProtocolRepository.cpp
+        ${TELEMETRY_SOURCES}
         src/services/transports/AbstractTransport.h
         src/services/transports/AbstractTransport.cpp
         src/services/transports/SerialTransport.h
@@ -282,8 +316,12 @@ if(BUILD_TESTING)
         src/app/AppContext.cpp
         src/services/ConnectionManager.h
         src/services/ConnectionManager.cpp
+        src/services/CommunicationCodec.h
+        src/services/CustomBinaryCodec.h
+        src/services/CustomBinaryCodec.cpp
         src/services/ProtocolRepository.h
         src/services/ProtocolRepository.cpp
+        ${TELEMETRY_SOURCES}
         src/services/transports/AbstractTransport.h
         src/services/transports/AbstractTransport.cpp
         src/services/transports/SerialTransport.h
@@ -296,6 +334,8 @@ if(BUILD_TESTING)
         src/theme/ThemeManager.cpp
         src/theme/IconManager.h
         src/theme/IconManager.cpp
+        src/utils/ChecksumUtils.h
+        src/utils/ChecksumUtils.cpp
         src/pages/ProtocolEditorPage.h
         src/pages/ProtocolEditorPage.cpp
         src/pages/protocol/ProtocolMime.h
@@ -333,6 +373,82 @@ if(BUILD_TESTING)
                     "$<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin>"
                     "$<TARGET_FILE_DIR:ProtocolEditorTest>/platforms"
             COMMENT "Deploying the offscreen Qt platform for protocol tests"
+        )
+    endif()
+
+    qt_add_executable(ChannelDataHubTest
+        tests/ChannelDataHubTest.cpp
+        src/models/ProtocolDefinition.h
+        src/models/TelemetryTypes.h
+        src/services/ChannelDataHub.h
+        src/services/ChannelDataHub.cpp
+    )
+    target_include_directories(ChannelDataHubTest PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_link_libraries(ChannelDataHubTest PRIVATE Qt6::Core Qt6::Gui)
+    if(MSVC)
+        target_compile_options(ChannelDataHubTest PRIVATE
+            /W4 /utf-8 /permissive-)
+    endif()
+    add_test(NAME ChannelDataHubTest COMMAND ChannelDataHubTest)
+
+    qt_add_executable(PlotPageSmokeTest
+        tests/PlotPageSmokeTest.cpp
+        resources/resources.qrc
+        src/models/AppTypes.h
+        src/models/ConnectionTypes.h
+        src/models/ProtocolDefinition.h
+        src/models/ProtocolTypes.h
+        src/models/ProtocolTypes.cpp
+        src/pages/PageId.h
+        src/app/AppSettings.h
+        src/app/AppSettings.cpp
+        src/app/AppContext.h
+        src/app/AppContext.cpp
+        src/services/ConnectionManager.h
+        src/services/ConnectionManager.cpp
+        src/services/CommunicationCodec.h
+        src/services/CustomBinaryCodec.h
+        src/services/CustomBinaryCodec.cpp
+        src/services/ProtocolRepository.h
+        src/services/ProtocolRepository.cpp
+        ${TELEMETRY_SOURCES}
+        src/services/transports/AbstractTransport.h
+        src/services/transports/AbstractTransport.cpp
+        src/services/transports/SerialTransport.h
+        src/services/transports/SerialTransport.cpp
+        src/services/transports/NetworkTransports.h
+        src/services/transports/NetworkTransports.cpp
+        src/services/transports/VirtualTransport.h
+        src/services/transports/VirtualTransport.cpp
+        src/theme/ThemeManager.h
+        src/theme/ThemeManager.cpp
+        src/theme/IconManager.h
+        src/theme/IconManager.cpp
+        src/utils/ChecksumUtils.h
+        src/utils/ChecksumUtils.cpp
+        src/pages/PlotPage.h
+        src/pages/PlotPage.cpp
+        ${PLOT_SOURCES}
+    )
+    target_include_directories(PlotPageSmokeTest PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_link_libraries(PlotPageSmokeTest PRIVATE
+        Qt6::Core Qt6::Concurrent Qt6::Gui Qt6::Widgets Qt6::Svg
+        Qt6::Network Qt6::SerialPort)
+    if(MSVC)
+        target_compile_options(PlotPageSmokeTest PRIVATE
+            /W4 /utf-8 /permissive-)
+    endif()
+    add_test(NAME PlotPageSmokeTest COMMAND PlotPageSmokeTest)
+    if(WIN32)
+        add_custom_command(TARGET PlotPageSmokeTest POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                    "$<TARGET_FILE_DIR:PlotPageSmokeTest>/platforms"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "$<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin>"
+                    "$<TARGET_FILE_DIR:PlotPageSmokeTest>/platforms"
+            COMMENT "Deploying the offscreen Qt platform for plot tests"
         )
     endif()
 endif()

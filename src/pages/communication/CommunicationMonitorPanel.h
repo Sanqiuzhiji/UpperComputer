@@ -4,15 +4,11 @@
 #include <QFrame>
 #include <QList>
 
-#include <map>
-#include <memory>
-
 #include "models/AppTypes.h"
 #include "models/ConnectionTypes.h"
 #include "models/ProtocolDefinition.h"
 
 class AppContext;
-class CommunicationParser;
 class QComboBox;
 class QTextCharFormat;
 class QTextEdit;
@@ -32,13 +28,12 @@ public:
     [[nodiscard]] QString decode(const QByteArray &bytes) const;
     [[nodiscard]] ParserMode receiveMode() const noexcept;
 
-    void setParser(
-        ParserMode mode,
-        std::shared_ptr<const CommunicationParser> parser);
-
 public slots:
     void setReceiveMode(ParserMode mode);
     void addEntry(DataDirection direction, const QByteArray &bytes);
+    void addReceivedData(qint64 timestampUs, const QByteArray &bytes);
+    void addParsedMessages(
+        qint64 timestampUs, const QList<ParsedMessage> &messages);
     void clearEntries();
 
 signals:
@@ -99,6 +94,5 @@ private:
     QByteArray m_pendingLog;
     TerminalDisplayMode m_displayMode{TerminalDisplayMode::Text};
     ParserMode m_receiveMode{ParserMode::RawData};
-    std::map<ParserMode, std::shared_ptr<const CommunicationParser>> m_parsers;
     bool m_emptyStateVisible{};
 };

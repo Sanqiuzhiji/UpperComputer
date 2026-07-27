@@ -236,7 +236,9 @@ int main(int argc, char *argv[])
     if (context.connectionManager()->state() != ConnectionState::Connected
         || context.connectionManager()->receiveTotal() < receivedBeforeSwitch
         || !display->toPlainText().contains(
-            QStringLiteral("JustFloat 解析器尚未接入"))) {
+            QStringLiteral("虚拟测试信号"))
+        || !display->toPlainText().contains(
+            QStringLiteral("虚拟信号 1"))) {
         return 7;
     }
 
@@ -371,8 +373,16 @@ int main(int argc, char *argv[])
         return 23;
     }
     monitor->addEntry(DataDirection::Transmit, lastPayload);
-    monitor->addEntry(DataDirection::Receive, lastPayload);
-    waitForEvents(30);
+    CustomBinaryCodec monitorCodec(testProtocol());
+    parsedMessages.clear();
+    parseError.clear();
+    if (!monitorCodec.parse(
+            lastPayload, &parsedMessages, &parseError)) {
+        return 24;
+    }
+    monitor->addParsedMessages(
+        QDateTime::currentMSecsSinceEpoch() * 1000, parsedMessages);
+    waitForEvents(60);
     const QString customBinaryDisplay = display->toPlainText();
     if (!customBinaryDisplay.contains(QStringLiteral("RX  Set values"))
         || !customBinaryDisplay.contains(
@@ -403,7 +413,7 @@ int main(int argc, char *argv[])
     QCoreApplication::processEvents();
     if (!hardware->isVisible() || !mode->isVisible()
         || !monitor->isVisible() || !send->isVisible()
-        || page.size() != QSize(960, 640)) {
+        || page.width() < 960 || page.height() != 640) {
         return 25;
     }
 

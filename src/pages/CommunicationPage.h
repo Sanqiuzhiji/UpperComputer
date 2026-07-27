@@ -13,7 +13,6 @@
 class AppContext;
 class CommunicationModePanel;
 class CommunicationMonitorPanel;
-class CommunicationParser;
 class CustomBinaryCodec;
 class CustomBinaryEncoder;
 class HardwareConfigPanel;
@@ -29,9 +28,6 @@ public:
         AppContext *context, QWidget *parent = nullptr);
 
     void setProtocols(const QList<ProtocolDefinition> &protocols);
-    void setReceiveParser(
-        ParserMode mode,
-        std::shared_ptr<const CommunicationParser> parser);
     void setCustomBinaryEncoder(
         const QString &protocolId,
         std::shared_ptr<const CustomBinaryEncoder> encoder);
@@ -43,7 +39,7 @@ signals:
     void requestProtocolLibrary();
 
 private:
-    void installCustomBinaryParser(const QString &protocolId);
+    void updateReceivePipeline();
     void notify(const QString &message, NotificationType type) const;
 
     AppContext *m_context{};

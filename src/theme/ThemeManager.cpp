@@ -104,6 +104,54 @@ QString ThemeManager::styleSheet() const
             background: #28A9E0; border: 1px solid #28A9E0; border-radius: 9px;
         }
         QToolTip { background: %4; color: %1; border: 1px solid %5; padding: 4px; }
+        QDialog { background: %2; }
+        QMenu {
+            background: %4; color: %1;
+            border: 1px solid %5; border-radius: 6px;
+            padding: 5px;
+        }
+        QMenu::item {
+            background: transparent; color: %1;
+            padding: 6px 28px 6px 10px; border-radius: 4px;
+        }
+        QMenu::item:selected { background: %7; color: %1; }
+        QMenu::item:disabled { color: %6; }
+        QMenu::separator {
+            height: 1px; background: %5; margin: 5px 7px;
+        }
+        QMenu::indicator:checked {
+            background: #28A9E0; border: 1px solid #28A9E0;
+            border-radius: 3px;
+        }
+        QTabWidget#plotTabWidget::pane {
+            background: %2; border: 1px solid %5;
+            border-radius: 7px;
+        }
+        QTabBar#plotTabBar {
+            background: transparent;
+        }
+        QTabBar#plotTabBar::tab {
+            background: %3; color: %6;
+            border: 1px solid %5;
+            border-bottom: none;
+            padding: 7px 28px 7px 14px;
+            margin-right: 2px;
+            border-top-left-radius: 6px;
+            border-top-right-radius: 6px;
+        }
+        QTabBar#plotTabBar::tab:hover {
+            background: %7; color: %1;
+        }
+        QTabBar#plotTabBar::tab:selected {
+            background: %4; color: %1;
+            border-color: #28A9E0;
+        }
+        QTabBar#plotTabBar QToolButton {
+            color: %6; padding: 1px; border-radius: 3px;
+        }
+        QTabBar#plotTabBar QToolButton:hover {
+            color: %1; background: %7;
+        }
         QLabel#pageTitle { font-size: 20pt; font-weight: 700; }
         QLabel#heroTitle { font-size: 24pt; font-weight: 700; color: #28A9E0; }
         QLabel#sectionTitle { font-weight: 700; }

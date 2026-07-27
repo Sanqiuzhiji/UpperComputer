@@ -38,6 +38,7 @@ void VirtualTransport::open(const TransportConfig &config)
     m_timer->setInterval(interval);
     m_timer->start();
     emit stateChanged(ConnectionState::Connected);
+    generateFrame();
 }
 
 void VirtualTransport::close()
