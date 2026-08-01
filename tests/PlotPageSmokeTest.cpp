@@ -1,4 +1,5 @@
 #include "app/AppContext.h"
+#include "app/AppSettings.h"
 #include "pages/PlotPage.h"
 #include "pages/plot/DetachableTabWidget.h"
 #include "pages/plot/DetachableTabBar.h"
@@ -39,6 +40,7 @@ int main(int argc, char *argv[])
         settingsDirectory.path());
 
     AppContext context;
+    context.settings()->setWorkspaceDirectory(settingsDirectory.path());
     PlotPage page(&context);
     page.resize(1100, 720);
     page.show();
@@ -80,6 +82,12 @@ int main(int argc, char *argv[])
     if (tabs->count() != 1
         || !tabs->currentWorkspace()->canvas()->editMode()) {
         return 5;
+    }
+    const QString firstPageTitle = tabs->tabText(0);
+    if (tabs->addWorkspace(QStringLiteral("  ") + firstPageTitle.toUpper()
+                           + QStringLiteral("  "))
+        || tabs->count() != 1) {
+        return 18;
     }
     auto *plot = page.findChild<RealtimePlotWidget *>(
         QStringLiteral("realtimePlotWidget"));

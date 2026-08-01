@@ -25,6 +25,9 @@ signals:
     void currentWorkspaceChanged(PlotWorkspacePage *workspace);
 
 private:
+    [[nodiscard]] bool hasWorkspaceTitle(
+        const QString &title, const QWidget *excludedPage = nullptr) const;
+    void installCloseButton(int index, QWidget *page);
     void closeWorkspace(int index);
     void renameWorkspace(int index);
     void detachWorkspace(int index, const QPoint &globalPosition);

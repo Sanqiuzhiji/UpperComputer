@@ -8,6 +8,7 @@
 #include "theme/ThemeManager.h"
 
 #include <QInputDialog>
+#include <QToolButton>
 
 DetachableTabWidget::DetachableTabWidget(
     AppContext *context, QWidget *parent)
@@ -19,7 +20,7 @@ DetachableTabWidget::DetachableTabWidget(
     bar->setObjectName(QStringLiteral("plotTabBar"));
     setTabBar(bar);
     setPalette(PlotTheme::palette(context->themeManager()->mode()));
-    setTabsClosable(true);
+    setTabsClosable(false);
     setMovable(true);
     setDocumentMode(true);
     connect(this, &QTabWidget::tabCloseRequested,
@@ -55,10 +56,21 @@ DetachableTabWidget::~DetachableTabWidget()
 
 PlotWorkspacePage *DetachableTabWidget::addWorkspace(const QString &title)
 {
+    QString pageTitle = title.trimmed();
+    if (pageTitle.isEmpty()) {
+        do {
+            pageTitle = tr("页面 %1").arg(++m_pageCounter);
+        } while (hasWorkspaceTitle(pageTitle));
+    } else if (hasWorkspaceTitle(pageTitle)) {
+        m_context->notify(
+            tr("页面名称“%1”已存在").arg(pageTitle),
+            NotificationType::Warning);
+        return nullptr;
+    }
+
     auto *page = new PlotWorkspacePage(m_context, this);
-    const QString pageTitle = title.trimmed().isEmpty()
-        ? tr("页面 %1").arg(++m_pageCounter) : title;
     const int index = addTab(page, pageTitle);
+    installCloseButton(index, page);
     setCurrentIndex(index);
     return page;
 }
@@ -71,6 +83,44 @@ PlotWorkspacePage *DetachableTabWidget::currentWorkspace() const
 int DetachableTabWidget::workspaceCount() const
 {
     return count() + m_windows.size();
+}
+
+bool DetachableTabWidget::hasWorkspaceTitle(
+    const QString &title, const QWidget *excludedPage) const
+{
+    const QString candidate = title.trimmed();
+    for (int index = 0; index < count(); ++index) {
+        if (widget(index) != excludedPage
+            && tabText(index).trimmed().compare(
+                candidate, Qt::CaseInsensitive) == 0) {
+            return true;
+        }
+    }
+    for (auto it = m_windows.cbegin(); it != m_windows.cend(); ++it) {
+        if (it.key() != excludedPage && it.value()
+            && it.value()->windowTitle().trimmed().compare(
+                candidate, Qt::CaseInsensitive) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void DetachableTabWidget::installCloseButton(
+    const int index, QWidget *page)
+{
+    auto *button = new QToolButton(tabBar());
+    button->setProperty("protocolDeleteButton", true);
+    button->setText(QStringLiteral("×"));
+    button->setToolTip(tr("关闭页面"));
+    button->setCursor(Qt::ArrowCursor);
+    button->setAutoRaise(true);
+    button->setFixedSize(22, 22);
+    tabBar()->setTabButton(index, QTabBar::RightSide, button);
+    connect(button, &QToolButton::clicked, this, [this, page] {
+        const int currentIndex = indexOf(page);
+        if (currentIndex >= 0) closeWorkspace(currentIndex);
+    });
 }
 
 void DetachableTabWidget::closeWorkspace(const int index)
@@ -88,7 +138,14 @@ void DetachableTabWidget::renameWorkspace(const int index)
     const QString title = QInputDialog::getText(
         this, tr("重命名页面"), tr("页面名称"),
         QLineEdit::Normal, tabText(index), &accepted).trimmed();
-    if (accepted && !title.isEmpty()) setTabText(index, title);
+    if (!accepted || title.isEmpty()) return;
+    if (hasWorkspaceTitle(title, widget(index))) {
+        m_context->notify(
+            tr("页面名称“%1”已存在").arg(title),
+            NotificationType::Warning);
+        return;
+    }
+    setTabText(index, title);
 }
 
 void DetachableTabWidget::detachWorkspace(
@@ -116,5 +173,6 @@ void DetachableTabWidget::attachWorkspace(
     m_windows.remove(page);
     page->setParent(this);
     const int index = addTab(page, title);
+    installCloseButton(index, page);
     setCurrentIndex(index);
 }

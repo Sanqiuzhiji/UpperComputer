@@ -125,32 +125,41 @@ QString ThemeManager::styleSheet() const
         }
         QTabWidget#plotTabWidget::pane {
             background: %2; border: 1px solid %5;
-            border-radius: 7px;
+            border-radius: 9px;
+            top: -1px;
         }
         QTabBar#plotTabBar {
             background: transparent;
+            qproperty-drawBase: false;
         }
         QTabBar#plotTabBar::tab {
             background: %3; color: %6;
             border: 1px solid %5;
             border-bottom: none;
-            padding: 7px 28px 7px 14px;
-            margin-right: 2px;
-            border-top-left-radius: 6px;
-            border-top-right-radius: 6px;
+            padding: 8px 30px 8px 16px;
+            margin: 3px 3px 1px 0;
+            min-width: 72px;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
         }
         QTabBar#plotTabBar::tab:hover {
             background: %7; color: %1;
+            border-color: #70C7EC;
+            margin-top: 1px;
+            padding-top: 9px;
         }
         QTabBar#plotTabBar::tab:selected {
-            background: %4; color: %1;
-            border-color: #28A9E0;
+            background: %4; color: #28A9E0;
+            border: 1px solid %5;
+            border-top: 3px solid #28A9E0;
+            border-bottom: 1px solid %4;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 0;
+            padding-top: 8px;
         }
-        QTabBar#plotTabBar QToolButton {
-            color: %6; padding: 1px; border-radius: 3px;
-        }
-        QTabBar#plotTabBar QToolButton:hover {
-            color: %1; background: %7;
+        QTabBar#plotTabBar::tab:pressed {
+            background: %5;
         }
         QLabel#pageTitle { font-size: 20pt; font-weight: 700; }
         QLabel#heroTitle { font-size: 24pt; font-weight: 700; color: #28A9E0; }

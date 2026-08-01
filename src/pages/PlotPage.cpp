@@ -191,6 +191,7 @@ bool PlotPage::loadPageFile(
     QString title = root.value(QStringLiteral("title")).toString().trimmed();
     if (title.isEmpty()) title = QFileInfo(path).completeBaseName();
     PlotWorkspacePage *page = m_tabs->addWorkspace(title);
+    if (!page) return false;
     QString error;
     if (!page->canvas()->restoreLayout(
             root.value(QStringLiteral("canvas")).toObject(), &error)) {
