@@ -100,7 +100,7 @@ struct VirtualDataConfig {
     double sampleIntervalMs{20.0};
     double signalFrequencyHz{0.5};
     double amplitude{1.0};
-    int channelCount{10};
+    int channelCount{5};
 
     bool operator==(const VirtualDataConfig &) const = default;
 };

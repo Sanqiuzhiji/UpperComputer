@@ -52,7 +52,7 @@ PlotChannelDialog::PlotChannelDialog(
         tr("颜色"), tr("线宽"), tr("状态")});
     m_list->header()->setSectionResizeMode(NameColumn, QHeaderView::Stretch);
     m_list->setRootIsDecorated(false);
-    m_list->setAlternatingRowColors(true);
+    m_list->setAlternatingRowColors(false);
     layout->addWidget(m_list, 1);
     auto *buttons = new QDialogButtonBox(
         QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);

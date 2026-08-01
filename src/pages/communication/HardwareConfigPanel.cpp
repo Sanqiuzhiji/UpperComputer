@@ -386,13 +386,13 @@ QWidget *HardwareConfigPanel::createVirtualPage()
     m_virtualAmplitude->setRange(0.0, 1000000.0);
     m_virtualAmplitude->setDecimals(2);
     m_virtualChannels = new QSpinBox(page);
-    m_virtualChannels->setRange(1, 128);
-    m_virtualChannels->setSuffix(QStringLiteral(" Ch"));
+    m_virtualChannels->setRange(5, 5);
+    m_virtualChannels->setSuffix(tr(" 个固定信号"));
     const QList<QPair<QString, QWidget *>> fields{
         {tr("采样周期"), m_virtualInterval},
         {tr("信号频率"), m_virtualFrequency},
         {tr("幅值"), m_virtualAmplitude},
-        {tr("通道数量"), m_virtualChannels}};
+        {tr("测试信号"), m_virtualChannels}};
     for (int i = 0; i < fields.size(); ++i) {
         layout->addWidget(fieldLabel(fields[i].first, page), 0, i);
         layout->addWidget(fields[i].second, 1, i);

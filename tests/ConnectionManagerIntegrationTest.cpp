@@ -250,7 +250,7 @@ bool testVirtualData()
     QEventLoop loop;
     QObject::connect(&manager, &ConnectionManager::dataReceived,
                      &loop, [&](const QByteArray &bytes) {
-        received = bytes.size() == 4 * 3;
+        received = bytes.size() == 4 * 5;
         loop.quit();
     });
     manager.connectTransport(

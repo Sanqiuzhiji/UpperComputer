@@ -58,14 +58,14 @@ int main(int argc, char *argv[])
         QStringLiteral("virtual-data"),
         QStringLiteral("generated-signals"),
         QStringLiteral("signal-1"));
-    if (context.channelDataHub()->channels().size() != 3
+    if (context.channelDataHub()->channels().size() != 5
         || context.channelDataHub()->snapshot(
             channelId, 0, std::numeric_limits<qint64>::max()).isEmpty()) {
         return 2;
     }
     auto *tabs = page.findChild<DetachableTabWidget *>(
         QStringLiteral("plotTabWidget"));
-    if (!tabs || tabs->count() != 1 || !tabs->currentWorkspace()) return 3;
+    if (!tabs || tabs->count() != 0 || tabs->currentWorkspace()) return 3;
     auto *addPage = page.findChild<QToolButton *>(
         QStringLiteral("plotAddPageButton"));
     auto *addPlot = page.findChild<QToolButton *>(
@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
     addPlot->click();
     edit->click();
     QCoreApplication::processEvents();
-    if (tabs->count() != 2
+    if (tabs->count() != 1
         || !tabs->currentWorkspace()->canvas()->editMode()) {
         return 5;
     }
@@ -182,10 +182,10 @@ int main(int argc, char *argv[])
     QCoreApplication::processEvents();
     const QList<PlotFloatingWindow *> floatingWindows =
         tabs->findChildren<PlotFloatingWindow *>();
-    if (tabs->count() != 1 || floatingWindows.size() != 1) return 14;
+    if (tabs->count() != 0 || floatingWindows.size() != 1) return 14;
     floatingWindows.constFirst()->close();
     QCoreApplication::processEvents();
-    if (tabs->count() != 2 || tabs->workspaceCount() != 2) return 15;
+    if (tabs->count() != 1 || tabs->workspaceCount() != 1) return 15;
     if (!QMetaObject::invokeMethod(
             tabs, "tabCloseRequested", Qt::DirectConnection,
             Q_ARG(int, tabs->currentIndex()))) {
@@ -193,7 +193,7 @@ int main(int argc, char *argv[])
     }
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
     QCoreApplication::processEvents();
-    if (tabs->count() != 1 || tabs->workspaceCount() != 1) return 17;
+    if (tabs->count() != 0 || tabs->workspaceCount() != 0) return 17;
     context.connectionManager()->disconnectTransport();
     return 0;
 }

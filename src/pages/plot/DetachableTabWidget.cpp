@@ -75,7 +75,7 @@ int DetachableTabWidget::workspaceCount() const
 
 void DetachableTabWidget::closeWorkspace(const int index)
 {
-    if (workspaceCount() <= 1 || index < 0 || index >= count()) return;
+    if (index < 0 || index >= count()) return;
     QWidget *page = widget(index);
     removeTab(index);
     page->deleteLater();

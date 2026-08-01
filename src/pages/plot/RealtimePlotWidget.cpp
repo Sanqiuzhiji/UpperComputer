@@ -109,13 +109,15 @@ void RealtimePlotWidget::refreshData()
         }
     }
     if (m_followLatest && latest > 0) {
-        m_maximumTimeUs = latest;
-        m_minimumTimeUs = latest - m_windowDurationUs;
+        m_minimumTimeUs = latest - static_cast<qint64>(
+            m_latestLineRatio * m_windowDurationUs);
+        m_maximumTimeUs = m_minimumTimeUs + m_windowDurationUs;
     } else if (m_maximumTimeUs <= m_minimumTimeUs) {
         m_maximumTimeUs = latest > 0
             ? latest : QDateTime::currentMSecsSinceEpoch() * 1000;
         m_minimumTimeUs = m_maximumTimeUs - m_windowDurationUs;
     }
+    if (latest > 0) m_latestTimeUs = latest;
     QHash<QString, QVector<ChannelSample>> next;
     const int pixels = qMax(1, static_cast<int>(plotRect().width()));
     for (const PlotChannelStyle &style : m_styles) {
@@ -130,6 +132,8 @@ void RealtimePlotWidget::refreshData()
                 pixels));
     }
     m_visibleSamples = std::move(next);
+    refreshTracer(&m_tracerA);
+    refreshTracer(&m_tracerB);
     if (m_autoY) updateYRange(false);
     update();
 }
@@ -250,6 +254,7 @@ void RealtimePlotWidget::paintEvent(QPaintEvent *)
     }
     if (hasSamples) {
         drawCurves(painter, area);
+        drawLatestLine(painter, area);
         drawTracers(painter, area);
         drawCrosshair(painter, area);
         drawLegend(painter, area);
@@ -421,9 +426,19 @@ void RealtimePlotWidget::placeTracer(Tracer *tracer, const qreal x)
     if (!tracer || m_visibleSamples.isEmpty()) return;
     const QRectF area = plotRect();
     const qreal boundedX = qBound(area.left(), x, area.right());
+    tracer->active = true;
+    tracer->positionRatio =
+        (boundedX - area.left()) / qMax<qreal>(1.0, area.width());
+    refreshTracer(tracer);
+    update();
+}
+
+void RealtimePlotWidget::refreshTracer(Tracer *tracer)
+{
+    if (!tracer || !tracer->active || m_visibleSamples.isEmpty()) return;
     const qint64 target = m_minimumTimeUs
         + static_cast<qint64>(
-            (boundedX - area.left()) / area.width()
+            qBound<qreal>(0.0, tracer->positionRatio, 1.0)
             * (m_maximumTimeUs - m_minimumTimeUs));
     qint64 bestTimestamp = 0;
     qint64 bestDistance = (std::numeric_limits<qint64>::max)();
@@ -438,7 +453,6 @@ void RealtimePlotWidget::placeTracer(Tracer *tracer, const qreal x)
         }
     }
     if (bestTimestamp == 0) return;
-    tracer->active = true;
     tracer->timestampUs = bestTimestamp;
     tracer->values.clear();
     for (auto it = m_visibleSamples.cbegin();
@@ -460,7 +474,22 @@ void RealtimePlotWidget::placeTracer(Tracer *tracer, const qreal x)
         }
         tracer->values.insert(it.key(), nearest->value);
     }
-    update();
+}
+
+void RealtimePlotWidget::drawLatestLine(
+    QPainter &painter, const QRectF &area) const
+{
+    if (m_latestTimeUs <= 0 || m_maximumTimeUs <= m_minimumTimeUs) return;
+    const qreal ratio = m_followLatest
+        ? m_latestLineRatio
+        : (m_latestTimeUs - m_minimumTimeUs)
+            / static_cast<double>(m_maximumTimeUs - m_minimumTimeUs);
+    if (ratio < 0.0 || ratio > 1.0) return;
+    const qreal x = area.left() + ratio * area.width();
+    QColor color(QStringLiteral("#28A9E0"));
+    color.setAlpha(210);
+    painter.setPen(QPen(color, 1.5, Qt::DashLine));
+    painter.drawLine(QPointF(x, area.top()), QPointF(x, area.bottom()));
 }
 
 QString RealtimePlotWidget::tracerText() const
@@ -513,31 +542,76 @@ QString RealtimePlotWidget::tracerText() const
 void RealtimePlotWidget::drawTracers(
     QPainter &painter, const QRectF &area) const
 {
-    const auto xFor = [this, &area](const qint64 timestamp) {
+    const auto xFor = [&area](const Tracer &tracer) {
         return area.left()
-            + (timestamp - m_minimumTimeUs)
-                / static_cast<double>(
-                    qMax<qint64>(1, m_maximumTimeUs - m_minimumTimeUs))
-                * area.width();
+            + qBound<qreal>(0.0, tracer.positionRatio, 1.0) * area.width();
     };
     if (m_tracerA.active && m_tracerB.active) {
-        const qreal left = xFor(qMin(
-            m_tracerA.timestampUs, m_tracerB.timestampUs));
-        const qreal right = xFor(qMax(
-            m_tracerA.timestampUs, m_tracerB.timestampUs));
+        const qreal left = qMin(xFor(m_tracerA), xFor(m_tracerB));
+        const qreal right = qMax(xFor(m_tracerA), xFor(m_tracerB));
         painter.fillRect(
             QRectF(left, area.top(), right - left, area.height()),
             QColor(40, 169, 224, 35));
     }
-    const auto draw = [&painter, &area, &xFor](
+    const auto draw = [this, &painter, &area, &xFor](
                           const Tracer &tracer,
                           const QString &name,
                           const QColor &color) {
         if (!tracer.active) return;
-        const qreal x = xFor(tracer.timestampUs);
+        const qreal x = xFor(tracer);
         painter.setPen(QPen(color, 2));
         painter.drawLine(QPointF(x, area.top()), QPointF(x, area.bottom()));
         painter.drawText(QPointF(x + 4, area.top() + 14), name);
+
+        for (const PlotChannelStyle &style : m_styles) {
+            if (!style.visible || !tracer.values.contains(style.channelId)) {
+                continue;
+            }
+            const double value = tracer.values.value(style.channelId);
+            const double yRange = qMax(1.0e-12, m_maximumY - m_minimumY);
+            const qreal y = area.bottom()
+                - (value - m_minimumY) / yRange * area.height();
+            if (y < area.top() || y > area.bottom()) continue;
+
+            const QPointF intersection(x, y);
+            const qreal markerRadius = 4.5;
+            painter.setPen(QPen(style.color, 1.8));
+            painter.setBrush(palette().color(QPalette::Base));
+            switch (m_tracerMarker) {
+            case TracerMarker::Cross:
+                painter.drawLine(
+                    intersection + QPointF(-markerRadius, 0),
+                    intersection + QPointF(markerRadius, 0));
+                painter.drawLine(
+                    intersection + QPointF(0, -markerRadius),
+                    intersection + QPointF(0, markerRadius));
+                break;
+            case TracerMarker::Circle:
+                painter.drawEllipse(intersection, markerRadius, markerRadius);
+                break;
+            case TracerMarker::Diamond: {
+                QPolygonF diamond;
+                diamond << intersection + QPointF(0, -markerRadius)
+                        << intersection + QPointF(markerRadius, 0)
+                        << intersection + QPointF(0, markerRadius)
+                        << intersection + QPointF(-markerRadius, 0);
+                painter.drawPolygon(diamond);
+                break;
+            }
+            }
+
+            if (m_showTracerLeaders) {
+                QColor leaderColor = style.color;
+                leaderColor.setAlpha(180);
+                painter.setPen(QPen(leaderColor, 1, Qt::DashLine));
+                painter.drawLine(intersection, QPointF(area.left(), y));
+                painter.setPen(style.color);
+                painter.drawText(
+                    QRectF(2, y - 9, area.left() - 7, 18),
+                    Qt::AlignRight | Qt::AlignVCenter,
+                    QString::number(value, 'g', 6));
+            }
+        }
     };
     draw(m_tracerA, QStringLiteral("A"), QColor("#F59E0B"));
     draw(m_tracerB, QStringLiteral("B"), QColor("#E5484D"));
@@ -560,13 +634,20 @@ void RealtimePlotWidget::mousePressEvent(QMouseEvent *event)
     }
     m_pressPosition = event->position().toPoint();
     m_mousePosition = event->position();
+    if (m_followLatest && m_latestTimeUs > 0) {
+        const qreal latestX = plotRect().left()
+            + m_latestLineRatio * plotRect().width();
+        if (std::abs(latestX - m_mousePosition.x()) <= 7.0) {
+            m_draggingLatestLine = true;
+            event->accept();
+            return;
+        }
+    }
     const auto tracerDistance = [this](const Tracer &tracer) {
         if (!tracer.active) return 1000.0;
         const QRectF area = plotRect();
         const qreal x = area.left()
-            + (tracer.timestampUs - m_minimumTimeUs)
-                / static_cast<double>(
-                    qMax<qint64>(1, m_maximumTimeUs - m_minimumTimeUs))
+            + qBound<qreal>(0.0, tracer.positionRatio, 1.0)
                 * area.width();
         return std::abs(x - m_mousePosition.x());
     };
@@ -585,6 +666,16 @@ void RealtimePlotWidget::mouseMoveEvent(QMouseEvent *event)
     m_mouseInside = true;
     const QPointF previous = m_mousePosition;
     m_mousePosition = event->position();
+    if (m_draggingLatestLine) {
+        const QRectF area = plotRect();
+        m_latestLineRatio = qBound<qreal>(
+            0.0,
+            (m_mousePosition.x() - area.left())
+                / qMax<qreal>(1.0, area.width()),
+            1.0);
+        refreshData();
+        return;
+    }
     if (m_draggedTracer) {
         placeTracer(m_draggedTracer, m_mousePosition.x());
         return;
@@ -612,17 +703,8 @@ void RealtimePlotWidget::mouseMoveEvent(QMouseEvent *event)
 void RealtimePlotWidget::mouseReleaseEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
-        const bool click =
-            (event->position().toPoint() - m_pressPosition)
-                .manhattanLength() < 4;
-        if (click && !m_draggedTracer && plotRect().contains(event->position())) {
-            if (!m_tracerA.active) {
-                placeTracer(&m_tracerA, event->position().x());
-            } else if (!m_tracerB.active) {
-                placeTracer(&m_tracerB, event->position().x());
-            }
-        }
         m_panning = false;
+        m_draggingLatestLine = false;
         m_draggedTracer = nullptr;
     }
     QWidget::mouseReleaseEvent(event);
@@ -632,7 +714,18 @@ void RealtimePlotWidget::mouseDoubleClickEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton
         && plotRect().contains(event->position())) {
-        resetView();
+        m_panning = false;
+        m_draggingLatestLine = false;
+        m_draggedTracer = nullptr;
+        if (!m_tracerA.active) {
+            placeTracer(&m_tracerA, event->position().x());
+        } else if (!m_tracerB.active) {
+            placeTracer(&m_tracerB, event->position().x());
+        } else {
+            m_tracerA = {};
+            m_tracerB = {};
+            update();
+        }
         event->accept();
         return;
     }
@@ -641,19 +734,37 @@ void RealtimePlotWidget::mouseDoubleClickEvent(QMouseEvent *event)
 
 void RealtimePlotWidget::wheelEvent(QWheelEvent *event)
 {
-    if (!plotRect().contains(event->position())) {
+    const QRectF area = plotRect();
+    const QPointF position = event->position();
+    const bool overPlot = area.contains(position);
+    const bool overHorizontalAxis =
+        position.x() >= area.left() && position.x() <= area.right()
+        && position.y() > area.bottom() && position.y() <= rect().bottom();
+    const bool overVerticalAxis =
+        position.x() >= rect().left() && position.x() < area.left()
+        && position.y() >= area.top() && position.y() <= area.bottom();
+    if (!overPlot && !overHorizontalAxis && !overVerticalAxis) {
         QWidget::wheelEvent(event);
         return;
     }
     const double factor = event->angleDelta().y() > 0 ? 0.8 : 1.25;
-    const bool xOnly = event->modifiers().testFlag(Qt::ControlModifier);
-    const bool yOnly = event->modifiers().testFlag(Qt::ShiftModifier);
-    if (!yOnly) {
-        const double ratio =
-            (event->position().x() - plotRect().left()) / plotRect().width();
-        const qint64 anchor = m_minimumTimeUs
-            + static_cast<qint64>(
-                ratio * (m_maximumTimeUs - m_minimumTimeUs));
+    const bool scaleX = overHorizontalAxis || overPlot;
+    const bool scaleY = overVerticalAxis || overPlot;
+    if (scaleX) {
+        double ratio =
+            qBound(0.0, (position.x() - area.left()) / area.width(), 1.0);
+        qint64 anchor = m_minimumTimeUs
+            + static_cast<qint64>(ratio
+                * (m_maximumTimeUs - m_minimumTimeUs));
+        if (m_latestTimeUs >= m_minimumTimeUs
+            && m_latestTimeUs <= m_maximumTimeUs) {
+            anchor = m_latestTimeUs;
+            ratio = m_followLatest
+                ? m_latestLineRatio
+                : (m_latestTimeUs - m_minimumTimeUs)
+                    / static_cast<double>(qMax<qint64>(
+                        1, m_maximumTimeUs - m_minimumTimeUs));
+        }
         const qint64 newDuration = qBound<qint64>(
             10000,
             static_cast<qint64>(
@@ -663,12 +774,10 @@ void RealtimePlotWidget::wheelEvent(QWheelEvent *event)
             anchor - static_cast<qint64>(newDuration * ratio);
         m_maximumTimeUs = m_minimumTimeUs + newDuration;
         m_windowDurationUs = newDuration;
-        m_followLatest = false;
     }
-    if (!xOnly) {
+    if (scaleY) {
         const double ratio =
-            (plotRect().bottom() - event->position().y())
-            / plotRect().height();
+            qBound(0.0, (area.bottom() - position.y()) / area.height(), 1.0);
         const double anchor =
             m_minimumY + ratio * (m_maximumY - m_minimumY);
         const double range = (m_maximumY - m_minimumY) * factor;
@@ -718,12 +827,23 @@ void RealtimePlotWidget::contextMenuEvent(QContextMenuEvent *event)
     QAction *cross = menu.addAction(tr("显示十字光标"));
     cross->setCheckable(true);
     cross->setChecked(m_showCrosshair);
-    QMenu *tracers = menu.addMenu(tr("Tracer"));
-    QAction *placeA = tracers->addAction(tr("放置 Tracer A"));
-    QAction *placeB = tracers->addAction(tr("放置 Tracer B"));
-    QAction *clearA = tracers->addAction(tr("清除 A"));
-    QAction *clearB = tracers->addAction(tr("清除 B"));
-    QAction *clearAll = tracers->addAction(tr("清除全部"));
+    QMenu *tracers = menu.addMenu(tr("Tracer 设置"));
+    QMenu *markerMenu = tracers->addMenu(tr("交点标记"));
+    QAction *crossMarker = markerMenu->addAction(tr("十字形"));
+    QAction *circleMarker = markerMenu->addAction(tr("圆圈"));
+    QAction *diamondMarker = markerMenu->addAction(tr("菱形"));
+    QActionGroup markerGroup(markerMenu);
+    markerGroup.setExclusive(true);
+    for (QAction *action : {crossMarker, circleMarker, diamondMarker}) {
+        action->setCheckable(true);
+        markerGroup.addAction(action);
+    }
+    crossMarker->setChecked(m_tracerMarker == TracerMarker::Cross);
+    circleMarker->setChecked(m_tracerMarker == TracerMarker::Circle);
+    diamondMarker->setChecked(m_tracerMarker == TracerMarker::Diamond);
+    QAction *showLeaders = tracers->addAction(tr("显示纵轴数据引出线"));
+    showLeaders->setCheckable(true);
+    showLeaders->setChecked(m_showTracerLeaders);
     menu.addSeparator();
     QAction *copy = menu.addAction(tr("复制截图"));
     QAction *save = menu.addAction(tr("保存截图"));
@@ -755,17 +875,17 @@ void RealtimePlotWidget::contextMenuEvent(QContextMenuEvent *event)
     } else if (selected == cross) {
         m_showCrosshair = cross->isChecked();
         update();
-    } else if (selected == placeA) placeTracer(&m_tracerA, event->pos().x());
-    else if (selected == placeB) placeTracer(&m_tracerB, event->pos().x());
-    else if (selected == clearA) {
-        m_tracerA = {};
+    } else if (selected == crossMarker) {
+        m_tracerMarker = TracerMarker::Cross;
         update();
-    } else if (selected == clearB) {
-        m_tracerB = {};
+    } else if (selected == circleMarker) {
+        m_tracerMarker = TracerMarker::Circle;
         update();
-    } else if (selected == clearAll) {
-        m_tracerA = {};
-        m_tracerB = {};
+    } else if (selected == diamondMarker) {
+        m_tracerMarker = TracerMarker::Diamond;
+        update();
+    } else if (selected == showLeaders) {
+        m_showTracerLeaders = showLeaders->isChecked();
         update();
     } else if (selected == copy) copyScreenshot();
     else if (selected == save) saveScreenshot();

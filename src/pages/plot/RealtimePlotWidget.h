@@ -42,8 +42,15 @@ protected:
     void leaveEvent(QEvent *event) override;
 
 private:
+    enum class TracerMarker {
+        Cross,
+        Circle,
+        Diamond
+    };
+
     struct Tracer {
         bool active{};
+        qreal positionRatio{};
         qint64 timestampUs{};
         QHash<QString, double> values;
     };
@@ -56,11 +63,13 @@ private:
     [[nodiscard]] QVector<ChannelSample> downsample(
         const QVector<ChannelSample> &samples, int pixelWidth) const;
     void placeTracer(Tracer *tracer, qreal x);
+    void refreshTracer(Tracer *tracer);
     [[nodiscard]] QString tracerText() const;
     void drawAxes(QPainter &painter, const QRectF &area) const;
     void drawCurves(QPainter &painter, const QRectF &area) const;
     void drawLegend(QPainter &painter, const QRectF &area) const;
     void drawCrosshair(QPainter &painter, const QRectF &area) const;
+    void drawLatestLine(QPainter &painter, const QRectF &area) const;
     void drawTracers(QPainter &painter, const QRectF &area) const;
     void saveScreenshot();
     void copyScreenshot();
@@ -72,6 +81,7 @@ private:
     QHash<QString, QVector<ChannelSample>> m_visibleSamples;
     qint64 m_minimumTimeUs{};
     qint64 m_maximumTimeUs{};
+    qint64 m_latestTimeUs{};
     qint64 m_windowDurationUs{10000000};
     double m_minimumY{-1.0};
     double m_maximumY{1.0};
@@ -86,7 +96,11 @@ private:
     QPoint m_pressPosition;
     bool m_mouseInside{};
     bool m_panning{};
+    bool m_draggingLatestLine{};
     Tracer *m_draggedTracer{};
     Tracer m_tracerA;
     Tracer m_tracerB;
+    qreal m_latestLineRatio{1.0};
+    TracerMarker m_tracerMarker{TracerMarker::Cross};
+    bool m_showTracerLeaders{true};
 };

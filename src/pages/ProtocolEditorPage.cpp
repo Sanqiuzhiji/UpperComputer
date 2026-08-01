@@ -635,7 +635,8 @@ void ProtocolEditorPage::importProtocol()
 {
     if (!maybeSaveChanges()) return;
     const QString source = QFileDialog::getOpenFileName(
-        this, QStringLiteral("打开工作空间文件"), {},
+        this, QStringLiteral("打开工作空间文件"),
+        m_repository->directoryPath(),
         QStringLiteral("UpperComputer Workspace (*.ucproto.json);;"
                        "JSON (*.json)"));
     if (source.isEmpty()) return;

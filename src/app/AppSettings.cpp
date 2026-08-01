@@ -534,7 +534,7 @@ void AppSettings::load()
     m_virtualDataConfig.amplitude = m_store.value(
         QLatin1String(kVirtualAmplitudeKey), 1.0).toDouble();
     m_virtualDataConfig.channelCount = m_store.value(
-        QLatin1String(kVirtualChannelsKey), 10).toInt();
+        QLatin1String(kVirtualChannelsKey), 5).toInt();
 
     m_parserMode = static_cast<ParserMode>(qBound(
         enumValue(ParserMode::RawData),

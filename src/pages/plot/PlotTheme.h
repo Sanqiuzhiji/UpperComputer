@@ -11,7 +11,7 @@ inline QPalette palette(const ThemeMode mode)
 {
     const bool dark = mode == ThemeMode::Dark;
     const QColor window(
-        dark ? QStringLiteral("#181A1F") : QStringLiteral("#F3F4F6"));
+        dark ? QStringLiteral("#202228") : QStringLiteral("#E9EDF2"));
     const QColor base(
         dark ? QStringLiteral("#25282E") : QStringLiteral("#FFFFFF"));
     const QColor alternate(

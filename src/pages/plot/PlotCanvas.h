@@ -2,6 +2,8 @@
 
 #include <QWidget>
 
+class QJsonObject;
+
 class AppContext;
 class DashboardItem;
 class RealtimePlotWidget;
@@ -14,6 +16,8 @@ public:
     explicit PlotCanvas(AppContext *context, QWidget *parent = nullptr);
     [[nodiscard]] QList<RealtimePlotWidget *> plots() const;
     [[nodiscard]] bool editMode() const noexcept;
+    [[nodiscard]] QJsonObject saveLayout() const;
+    bool restoreLayout(const QJsonObject &layout, QString *errorMessage);
 
 public slots:
     RealtimePlotWidget *addRealtimePlot();

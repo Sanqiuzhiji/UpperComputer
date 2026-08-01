@@ -8,6 +8,17 @@
 
 namespace {
 constexpr double kTwoPi = 6.28318530717958647692;
+constexpr int kVirtualSignalCount = 5;
+
+double squareFourier(const double phase, const int maximumHarmonic)
+{
+    double value = 0.0;
+    for (int harmonic = 1;
+         harmonic <= maximumHarmonic; harmonic += 2) {
+        value += std::sin(harmonic * phase) / harmonic;
+    }
+    return 4.0 / 3.14159265358979323846 * value;
+}
 }
 
 VirtualTransport::VirtualTransport(QObject *parent)
@@ -23,9 +34,7 @@ void VirtualTransport::open(const TransportConfig &config)
 {
     const auto *virtualConfig = std::get_if<VirtualDataConfig>(&config);
     if (!virtualConfig || virtualConfig->sampleIntervalMs <= 0.0
-        || virtualConfig->signalFrequencyHz < 0.0
-        || virtualConfig->channelCount < 1
-        || virtualConfig->channelCount > 256) {
+        || virtualConfig->signalFrequencyHz < 0.0) {
         emit errorOccurred(tr("虚拟数据配置无效"));
         emit stateChanged(ConnectionState::Error);
         return;
@@ -63,18 +72,23 @@ bool VirtualTransport::write(const QByteArray &, QString *errorMessage)
 void VirtualTransport::generateFrame()
 {
     QByteArray frame;
-    frame.reserve(m_config.channelCount * static_cast<int>(sizeof(float)));
+    frame.reserve(kVirtualSignalCount * static_cast<int>(sizeof(float)));
     QDataStream stream(&frame, QIODevice::WriteOnly);
     stream.setByteOrder(QDataStream::LittleEndian);
     stream.setFloatingPointPrecision(QDataStream::SinglePrecision);
     const double seconds =
         m_sampleIndex * m_config.sampleIntervalMs / 1000.0;
-    for (int channel = 0; channel < m_config.channelCount; ++channel) {
-        const double phase = channel * kTwoPi / m_config.channelCount;
-        const float value = static_cast<float>(
-            m_config.amplitude
-            * std::sin(kTwoPi * m_config.signalFrequencyHz * seconds + phase));
-        stream << value;
+    const double phase = kTwoPi * m_config.signalFrequencyHz * seconds;
+    const double sine = std::sin(phase);
+    const double square = sine >= 0.0 ? 1.0 : -1.0;
+    const double generatedValues[kVirtualSignalCount]{
+        sine,
+        square,
+        squareFourier(phase, 1),
+        squareFourier(phase, 3),
+        squareFourier(phase, 5)};
+    for (const double generatedValue : generatedValues) {
+        stream << static_cast<float>(m_config.amplitude * generatedValue);
     }
     ++m_sampleIndex;
     emit dataReceived(frame);

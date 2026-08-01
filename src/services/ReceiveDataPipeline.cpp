@@ -116,6 +116,12 @@ void ReceiveDataPipeline::publishVirtualData(
     message.messageId = QStringLiteral("generated-signals");
     message.displayName = tr("虚拟测试信号");
     const qsizetype channelCount = data.size() / floatBytes;
+    const QStringList signalNames{
+        tr("正弦波"),
+        tr("方波"),
+        tr("方波傅里叶 1 阶"),
+        tr("方波傅里叶 3 阶"),
+        tr("方波傅里叶 5 阶")};
     message.fields.reserve(channelCount);
     for (qsizetype index = 0; index < channelCount; ++index) {
         float value = 0.0F;
@@ -127,7 +133,9 @@ void ReceiveDataPipeline::publishVirtualData(
         const QString number = QString::number(index + 1);
         message.fields.append({
             QStringLiteral("signal-%1").arg(number),
-            tr("虚拟信号 %1").arg(number),
+            index < signalNames.size()
+                ? signalNames.at(index)
+                : tr("虚拟信号 %1").arg(number),
             value,
             tr("a.u."),
             ProtocolFieldRole::Value

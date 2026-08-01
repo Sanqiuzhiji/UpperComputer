@@ -8,12 +8,15 @@
 #include "theme/IconManager.h"
 #include "theme/ThemeManager.h"
 
+#include <QDir>
+
 AppContext::AppContext(QObject *parent)
     : QObject(parent),
       m_settings(new AppSettings(this)),
       m_connectionManager(new ConnectionManager(this)),
       m_protocolRepository(new ProtocolRepository(
-          this, m_settings->workspaceDirectory())),
+          this, QDir(m_settings->workspaceDirectory())
+                    .filePath(QStringLiteral("protocols")))),
       m_channelDataHub(new ChannelDataHub(this)),
       m_receiveDataPipeline(new ReceiveDataPipeline(
           m_settings,
@@ -30,7 +33,10 @@ AppContext::AppContext(QObject *parent)
             Qt::QueuedConnection);
     m_protocolRepository->rescan();
     connect(m_settings, &AppSettings::workspaceDirectoryChanged,
-            m_protocolRepository, &ProtocolRepository::setDirectoryPath);
+            m_protocolRepository, [this](const QString &directory) {
+                m_protocolRepository->setDirectoryPath(
+                    QDir(directory).filePath(QStringLiteral("protocols")));
+            });
 }
 
 AppSettings *AppContext::settings() const noexcept

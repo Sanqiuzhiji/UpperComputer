@@ -21,6 +21,8 @@ signals:
     void pauseChanged(bool paused);
     void resetRequested();
     void autoYRequested();
+    void savePageRequested();
+    void importPageRequested();
 
 private:
     QToolButton *button(
@@ -37,4 +39,6 @@ private:
     QToolButton *m_pause{};
     QToolButton *m_reset{};
     QToolButton *m_autoY{};
+    QToolButton *m_savePage{};
+    QToolButton *m_importPage{};
 };

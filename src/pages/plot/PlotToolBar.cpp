@@ -37,10 +37,19 @@ PlotToolBar::PlotToolBar(AppContext *context, QWidget *parent)
         QStringLiteral("plotAutoYButton"), tr("适配 Y 轴"),
         tr("对当前页面所有绘图执行一次 Y 轴适配"),
         QStringLiteral(":/icons/protocol/save.svg"));
+    m_savePage = button(
+        QStringLiteral("plotSavePageButton"), tr("保存页面"),
+        tr("保存当前 Plot 页面布局"),
+        QStringLiteral(":/icons/protocol/save_as.svg"));
+    m_importPage = button(
+        QStringLiteral("plotImportPageButton"), tr("导入页面"),
+        tr("从工作空间文件导入 Plot 页面"),
+        QStringLiteral(":/icons/protocol/import.svg"));
     m_edit->setCheckable(true);
     m_pause->setCheckable(true);
     for (QToolButton *item :
-         {m_addPage, m_addPlot, m_edit, m_pause, m_reset, m_autoY}) {
+         {m_addPage, m_addPlot, m_edit, m_pause, m_reset, m_autoY,
+          m_savePage, m_importPage}) {
         layout->addWidget(item);
     }
     layout->addStretch();
@@ -56,6 +65,10 @@ PlotToolBar::PlotToolBar(AppContext *context, QWidget *parent)
             this, &PlotToolBar::resetRequested);
     connect(m_autoY, &QToolButton::clicked,
             this, &PlotToolBar::autoYRequested);
+    connect(m_savePage, &QToolButton::clicked,
+            this, &PlotToolBar::savePageRequested);
+    connect(m_importPage, &QToolButton::clicked,
+            this, &PlotToolBar::importPageRequested);
     connect(context->iconManager(), &IconManager::iconsChanged,
             this, &PlotToolBar::refreshIcons);
     refreshIcons();
@@ -92,7 +105,8 @@ QToolButton *PlotToolBar::button(
 void PlotToolBar::refreshIcons()
 {
     for (QToolButton *item :
-         {m_addPage, m_addPlot, m_edit, m_pause, m_reset, m_autoY}) {
+         {m_addPage, m_addPlot, m_edit, m_pause, m_reset, m_autoY,
+          m_savePage, m_importPage}) {
         item->setIcon(m_context->iconManager()->icon(
             item->property("iconPath").toString()));
         item->setIconSize(QSize(17, 17));

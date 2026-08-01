@@ -238,7 +238,7 @@ int main(int argc, char *argv[])
         || !display->toPlainText().contains(
             QStringLiteral("虚拟测试信号"))
         || !display->toPlainText().contains(
-            QStringLiteral("虚拟信号 1"))) {
+            QStringLiteral("正弦波"))) {
         return 7;
     }
 

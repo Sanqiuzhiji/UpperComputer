@@ -7,6 +7,8 @@
 #include "theme/ThemeManager.h"
 
 #include <QContextMenuEvent>
+#include <QJsonArray>
+#include <QJsonObject>
 #include <QMenu>
 #include <QPainter>
 #include <QResizeEvent>
@@ -43,6 +45,115 @@ QList<RealtimePlotWidget *> PlotCanvas::plots() const
 bool PlotCanvas::editMode() const noexcept
 {
     return m_editMode;
+}
+
+QJsonObject PlotCanvas::saveLayout() const
+{
+    QJsonArray plotsJson;
+    const qreal canvasWidth = qMax(1, width());
+    const qreal canvasHeight = qMax(1, height());
+    for (DashboardItem *item : m_items) {
+        auto *plot = qobject_cast<RealtimePlotWidget *>(item->content());
+        if (!plot) continue;
+        const QRect geometry = item->geometry();
+        QJsonArray channels;
+        for (const PlotChannelStyle &style : plot->channelStyles()) {
+            channels.append(QJsonObject{
+                {QStringLiteral("channelId"), style.channelId},
+                {QStringLiteral("visible"), style.visible},
+                {QStringLiteral("color"), style.color.name(QColor::HexArgb)},
+                {QStringLiteral("lineWidth"), style.lineWidth}});
+        }
+        plotsJson.append(QJsonObject{
+            {QStringLiteral("geometry"), QJsonObject{
+                {QStringLiteral("x"), geometry.x() / canvasWidth},
+                {QStringLiteral("y"), geometry.y() / canvasHeight},
+                {QStringLiteral("width"), geometry.width() / canvasWidth},
+                {QStringLiteral("height"), geometry.height() / canvasHeight}}},
+            {QStringLiteral("channels"), channels}});
+    }
+    return QJsonObject{{QStringLiteral("plots"), plotsJson}};
+}
+
+bool PlotCanvas::restoreLayout(
+    const QJsonObject &layout, QString *errorMessage)
+{
+    const QJsonValue plotsValue = layout.value(QStringLiteral("plots"));
+    if (!plotsValue.isArray() || plotsValue.toArray().size() > 128) {
+        if (errorMessage) *errorMessage = tr("Plot 页面中的绘图列表无效");
+        return false;
+    }
+    struct RestoredPlot {
+        QRect geometry;
+        QList<PlotChannelStyle> styles;
+    };
+    QList<RestoredPlot> restored;
+    const qreal canvasWidth = qMax(360, width());
+    const qreal canvasHeight = qMax(260, height());
+    for (const QJsonValue &value : plotsValue.toArray()) {
+        if (!value.isObject()) {
+            if (errorMessage) *errorMessage = tr("Plot 绘图项格式无效");
+            return false;
+        }
+        const QJsonObject object = value.toObject();
+        const QJsonObject geometry =
+            object.value(QStringLiteral("geometry")).toObject();
+        const double x = geometry.value(QStringLiteral("x")).toDouble(-1.0);
+        const double y = geometry.value(QStringLiteral("y")).toDouble(-1.0);
+        const double widthRatio =
+            geometry.value(QStringLiteral("width")).toDouble(-1.0);
+        const double heightRatio =
+            geometry.value(QStringLiteral("height")).toDouble(-1.0);
+        if (x < 0.0 || x > 1.0 || y < 0.0 || y > 1.0
+            || widthRatio <= 0.0 || widthRatio > 1.0
+            || heightRatio <= 0.0 || heightRatio > 1.0) {
+            if (errorMessage) *errorMessage = tr("Plot 绘图项位置或尺寸无效");
+            return false;
+        }
+        RestoredPlot entry;
+        const int restoredWidth = qMin(
+            qRound(canvasWidth), qMax(320, qRound(widthRatio * canvasWidth)));
+        const int restoredHeight = qMin(
+            qRound(canvasHeight), qMax(220, qRound(heightRatio * canvasHeight)));
+        entry.geometry = QRect(
+            qBound(0, qRound(x * canvasWidth),
+                   qRound(canvasWidth) - restoredWidth),
+            qBound(0, qRound(y * canvasHeight),
+                   qRound(canvasHeight) - restoredHeight),
+            restoredWidth, restoredHeight);
+        const QJsonValue channelsValue = object.value(QStringLiteral("channels"));
+        if (!channelsValue.isArray()) {
+            if (errorMessage) *errorMessage = tr("Plot 通道配置无效");
+            return false;
+        }
+        for (const QJsonValue &channelValue : channelsValue.toArray()) {
+            const QJsonObject channel = channelValue.toObject();
+            const QString id =
+                channel.value(QStringLiteral("channelId")).toString();
+            const QColor color(
+                channel.value(QStringLiteral("color")).toString());
+            const double lineWidth =
+                channel.value(QStringLiteral("lineWidth")).toDouble(-1.0);
+            if (!channelValue.isObject() || id.isEmpty()
+                || !color.isValid() || lineWidth < 0.5 || lineWidth > 8.0) {
+                if (errorMessage) *errorMessage = tr("Plot 通道样式无效");
+                return false;
+            }
+            entry.styles.append({
+                id,
+                channel.value(QStringLiteral("visible")).toBool(true),
+                color,
+                lineWidth});
+        }
+        restored.append(entry);
+    }
+    for (const RestoredPlot &entry : restored) {
+        RealtimePlotWidget *plot = addRealtimePlot();
+        auto *item = qobject_cast<DashboardItem *>(plot->parentWidget());
+        item->setGeometry(entry.geometry);
+        plot->setChannelStyles(entry.styles);
+    }
+    return true;
 }
 
 RealtimePlotWidget *PlotCanvas::addRealtimePlot()
