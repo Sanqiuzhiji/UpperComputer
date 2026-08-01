@@ -1,5 +1,6 @@
 #include "AppSettings.h"
 
+#include <QCoreApplication>
 #include <QDir>
 
 namespace {
@@ -213,7 +214,10 @@ QString AppSettings::workspaceDirectory() const
 
 QString AppSettings::defaultWorkspaceDirectory()
 {
-#ifdef UPPERCOMPUTER_PROJECT_DIR
+#ifdef UPPERCOMPUTER_PORTABLE_BUILD
+    return QDir(QCoreApplication::applicationDirPath())
+        .filePath(QStringLiteral("workspaces"));
+#elif defined(UPPERCOMPUTER_PROJECT_DIR)
     return QDir(QStringLiteral(UPPERCOMPUTER_PROJECT_DIR))
         .filePath(QStringLiteral("workspaces"));
 #else
