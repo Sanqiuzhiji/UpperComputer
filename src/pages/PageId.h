@@ -9,7 +9,8 @@ enum class PageId {
     CanBus,
     MdfViewer,
     About,
-    Settings
+    Settings,
+    CescTool
 };
 
 Q_DECLARE_METATYPE(PageId)

@@ -2,6 +2,7 @@
 
 #include "pages/AboutPage.h"
 #include "pages/CanBusPage.h"
+#include "pages/CescToolPage.h"
 #include "pages/CommunicationPage.h"
 #include "pages/MdfViewerPage.h"
 #include "pages/PlotPage.h"
@@ -56,6 +57,15 @@ const QList<PageDescriptor> &pageDescriptors()
             false,
             [](AppContext *context, QWidget *parent) {
                 return new MdfViewerPage(context, parent);
+            }
+        },
+        {
+            PageId::CescTool,
+            QStringLiteral("CESC Tool"),
+            QStringLiteral(":/icons/navigation/cesc_tool.svg"),
+            false,
+            [](AppContext *context, QWidget *parent) {
+                return new CescToolPage(context, parent);
             }
         },
         {

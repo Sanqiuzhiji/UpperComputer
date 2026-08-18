@@ -119,6 +119,10 @@ qt_add_executable(UpperComputer WIN32
     src/pages/protocol/ProtocolPropertyPanel.cpp
     src/pages/CanBusPage.h
     src/pages/CanBusPage.cpp
+    src/pages/CescToolPage.h
+    src/pages/CescToolPage.cpp
+    src/services/CescFirmwareUploader.h
+    src/services/CescFirmwareUploader.cpp
     src/pages/MdfViewerPage.h
     src/pages/MdfViewerPage.cpp
     src/pages/AboutPage.h

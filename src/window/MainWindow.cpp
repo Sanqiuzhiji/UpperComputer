@@ -16,6 +16,7 @@
 
 #include <QEvent>
 #include <QCloseEvent>
+#include <QCursor>
 #include <QGraphicsOpacityEffect>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -157,7 +158,13 @@ bool MainWindow::nativeEvent(const QByteArray &eventType, void *message, qintptr
         return QMainWindow::nativeEvent(eventType, message, result);
     }
 
-    const QPoint global(GET_X_LPARAM(msg->lParam), GET_Y_LPARAM(msg->lParam));
+    // WM_NCHITTEST reports native (physical-pixel) screen coordinates, while
+    // QWidget::mapFromGlobal expects Qt's device-independent coordinates.
+    // Mixing the two makes a large part of the window look like the resize
+    // border on displays using 125%/150% scaling, swallowing title-bar button
+    // clicks. QCursor::pos() is already converted to Qt coordinates and is
+    // authoritative for this mouse-driven hit test.
+    const QPoint global = QCursor::pos();
     const QPoint local = mapFromGlobal(global);
     const int border = isMaximized() ? 0 : 7;
 

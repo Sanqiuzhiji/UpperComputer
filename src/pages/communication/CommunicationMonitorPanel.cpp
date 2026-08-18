@@ -296,6 +296,7 @@ void CommunicationMonitorPanel::clearEntries()
     m_pendingBytes = 0;
     m_terminal->clear();
     m_emptyStateVisible = false;
+    m_rawTextLineOpen = false;
     showModeEmptyState();
 }
 
@@ -370,6 +371,7 @@ void CommunicationMonitorPanel::renderAll()
     m_pendingBytes = 0;
     m_terminal->clear();
     m_emptyStateVisible = false;
+    m_rawTextLineOpen = false;
     for (const MonitorEntry &entry : std::as_const(m_entries)) {
         if ((entry.direction == DataDirection::Receive
              && !m_receiveButton->isChecked())
@@ -393,20 +395,43 @@ void CommunicationMonitorPanel::appendEntry(const MonitorEntry &entry)
     QTextCharFormat lineFormat;
     lineFormat.setForeground(directionColor);
 
-    if (m_timestampButton->isChecked()) {
-        cursor.insertText(QStringLiteral("[%1] ").arg(
-            entry.timestamp.toString(QStringLiteral("HH:mm:ss.zzz"))),
-            lineFormat);
-    }
-
     QTextCharFormat directionFormat;
     directionFormat.setBackground(directionColor);
     directionFormat.setForeground(QColor(QStringLiteral("#101418")));
     directionFormat.setFontWeight(QFont::DemiBold);
-    cursor.insertText(entry.direction == DataDirection::Receive
-        ? QStringLiteral(" RX ") : QStringLiteral(" TX "), directionFormat);
-    cursor.insertText(QStringLiteral(" "), lineFormat);
-    m_terminal->setTextCursor(cursor);
+
+    const auto appendPrefix = [&] {
+        cursor = m_terminal->textCursor();
+        cursor.movePosition(QTextCursor::End);
+        if (m_timestampButton->isChecked()) {
+            cursor.insertText(QStringLiteral("[%1] ").arg(
+                entry.timestamp.toString(QStringLiteral("HH:mm:ss.zzz"))),
+                lineFormat);
+        }
+        cursor.insertText(entry.direction == DataDirection::Receive
+            ? QStringLiteral(" RX ") : QStringLiteral(" TX "), directionFormat);
+        cursor.insertText(QStringLiteral(" "), lineFormat);
+        m_terminal->setTextCursor(cursor);
+    };
+
+    const bool streamRawText = !entry.structured
+        && m_receiveMode == ParserMode::RawData
+        && m_displayMode == TerminalDisplayMode::Text;
+    if (m_rawTextLineOpen
+        && (!streamRawText || entry.direction != m_rawTextLineDirection)) {
+        cursor = m_terminal->textCursor();
+        cursor.movePosition(QTextCursor::End);
+        cursor.insertText(QStringLiteral("\n"), QTextCharFormat());
+        m_terminal->setTextCursor(cursor);
+        m_rawTextLineOpen = false;
+    }
+    if (!streamRawText || !m_rawTextLineOpen) {
+        appendPrefix();
+        if (streamRawText) {
+            m_rawTextLineOpen = true;
+            m_rawTextLineDirection = entry.direction;
+        }
+    }
     if (entry.structured) {
         QStringList fields;
         for (qsizetype i = 0; i < entry.fields.size(); ++i) {
@@ -436,20 +461,48 @@ void CommunicationMonitorPanel::appendEntry(const MonitorEntry &entry)
             ? displayText(entry.rawData)
             : QStringLiteral("HEX: %1").arg(
                   QString::fromLatin1(entry.rawData.toHex(' ').toUpper()));
-        if (m_receiveMode == ParserMode::RawData
+        const bool renderAnsi = m_receiveMode == ParserMode::RawData
             && m_displayMode == TerminalDisplayMode::Text
-            && m_ansiButton->isChecked()) {
-            appendAnsiText(text, lineFormat);
-        } else {
+            && m_ansiButton->isChecked();
+        if (!renderAnsi) {
             static const QRegularExpression ansi(
                 QStringLiteral("\\x1B\\[[0-9;?]*[ -/]*[@-~]"));
-            cursor = m_terminal->textCursor();
-            cursor.insertText(text.remove(ansi), lineFormat);
+            text.remove(ansi);
+        }
+
+        // Serial/network reads are arbitrary chunks rather than logical lines.
+        // Keep appending chunks until an actual CR/LF delimiter is received;
+        // only then start another timestamped RX/TX line.
+        QStringList lines = text.split(
+            QRegularExpression(QStringLiteral("\\r\\n|\\r|\\n")),
+            Qt::KeepEmptyParts);
+        for (qsizetype i = 0; i < lines.size(); ++i) {
+            if (i > 0) {
+                cursor = m_terminal->textCursor();
+                cursor.movePosition(QTextCursor::End);
+                cursor.insertText(QStringLiteral("\n"), QTextCharFormat());
+                m_terminal->setTextCursor(cursor);
+                m_rawTextLineOpen = false;
+                if (!lines.at(i).isEmpty() || i + 1 < lines.size()) {
+                    appendPrefix();
+                    m_rawTextLineOpen = streamRawText;
+                    m_rawTextLineDirection = entry.direction;
+                }
+            }
+            if (renderAnsi) {
+                appendAnsiText(lines.at(i), lineFormat);
+            } else {
+                cursor = m_terminal->textCursor();
+                cursor.insertText(lines.at(i), lineFormat);
+                m_terminal->setTextCursor(cursor);
+            }
         }
     }
     cursor = m_terminal->textCursor();
     cursor.movePosition(QTextCursor::End);
-    cursor.insertText(QStringLiteral("\n"), QTextCharFormat());
+    if (!streamRawText) {
+        cursor.insertText(QStringLiteral("\n"), QTextCharFormat());
+    }
     m_terminal->setTextCursor(cursor);
 }
 

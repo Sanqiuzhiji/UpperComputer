@@ -487,7 +487,7 @@ void AppSettings::load()
     const int page = m_store.value(
         QLatin1String(kLastPageKey), enumValue(PageId::Plot)).toInt();
     if (page >= enumValue(PageId::Plot)
-        && page <= enumValue(PageId::Settings)) {
+        && page <= enumValue(PageId::CescTool)) {
         m_lastPage = static_cast<PageId>(page);
     }
 

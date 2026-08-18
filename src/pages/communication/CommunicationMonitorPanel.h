@@ -95,4 +95,6 @@ private:
     TerminalDisplayMode m_displayMode{TerminalDisplayMode::Text};
     ParserMode m_receiveMode{ParserMode::RawData};
     bool m_emptyStateVisible{};
+    bool m_rawTextLineOpen{};
+    DataDirection m_rawTextLineDirection{DataDirection::Receive};
 };

@@ -15,6 +15,7 @@
         <file alias="navigation/mdf_viewer.svg">icons/navigation/mdf_viewer.svg</file>
         <file alias="navigation/about.svg">icons/navigation/about.svg</file>
         <file alias="navigation/settings.svg">icons/navigation/settings.svg</file>
+        <file alias="navigation/cesc_tool.svg">icons/navigation/cesc_tool.svg</file>
         <file alias="common/app.svg">icons/common/app.svg</file>
         <file alias="connection/refresh.svg">icons/connection/refresh.svg</file>
         <file alias="connection/help.svg">icons/connection/help.svg</file>
