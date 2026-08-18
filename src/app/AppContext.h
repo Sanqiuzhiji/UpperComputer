@@ -8,6 +8,7 @@
 class AppSettings;
 class ChannelDataHub;
 class ConnectionManager;
+class CescFirmwareUploader;
 class IconManager;
 class ProtocolRepository;
 class ReceiveDataPipeline;
@@ -19,9 +20,11 @@ class AppContext final : public QObject
 
 public:
     explicit AppContext(QObject *parent = nullptr);
+    ~AppContext() override;
 
     [[nodiscard]] AppSettings *settings() const noexcept;
     [[nodiscard]] ConnectionManager *connectionManager() const noexcept;
+    [[nodiscard]] CescFirmwareUploader *cescFirmwareUploader() const noexcept;
     [[nodiscard]] ThemeManager *themeManager() const noexcept;
     [[nodiscard]] IconManager *iconManager() const noexcept;
     [[nodiscard]] ProtocolRepository *protocolRepository() const noexcept;
@@ -37,6 +40,7 @@ signals:
 private:
     AppSettings *m_settings{};
     ConnectionManager *m_connectionManager{};
+    CescFirmwareUploader *m_cescFirmwareUploader{};
     ProtocolRepository *m_protocolRepository{};
     ChannelDataHub *m_channelDataHub{};
     ReceiveDataPipeline *m_receiveDataPipeline{};

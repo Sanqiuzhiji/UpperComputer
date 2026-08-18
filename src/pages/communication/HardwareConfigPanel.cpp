@@ -184,6 +184,13 @@ void HardwareConfigPanel::setConnectionState(const ConnectionState state)
     updateUiForState();
 }
 
+void HardwareConfigPanel::setFirmwareOperationActive(const bool active)
+{
+    if (m_firmwareOperationActive == active) return;
+    m_firmwareOperationActive = active;
+    updateUiForState();
+}
+
 void HardwareConfigPanel::setTcpClients(const QStringList &clients)
 {
     const QString selected = m_tcpClients->currentText();
@@ -484,7 +491,8 @@ void HardwareConfigPanel::updateUiForState()
     }
     // Connecting stays cancellable; Disconnecting is locked to prevent races.
     m_connectionSwitch->setEnabled(
-        m_state != ConnectionState::Disconnecting);
+        m_state != ConnectionState::Disconnecting
+        && !m_firmwareOperationActive);
     {
         const QSignalBlocker blocker(m_connectionSwitch);
         m_connectionSwitch->setChecked(

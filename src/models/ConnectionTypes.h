@@ -33,6 +33,11 @@ enum class DataDirection {
     Transmit
 };
 
+enum class CommunicationTrafficSource {
+    NormalCommunication,
+    CescFirmware
+};
+
 enum class TerminalDisplayMode {
     Text,
     Hex

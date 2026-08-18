@@ -15,6 +15,11 @@ int main(int argc, char *argv[])
     QSettings::setPath(QSettings::IniFormat, QSettings::UserScope,
                        settingsDirectory.path());
 
+    {
+        AppSettings defaults;
+        if (defaults.showCescFirmwareTraffic()) return 13;
+    }
+
     const SerialConfig serial{
         QStringLiteral("COM42"), 921600, QSerialPort::Data7,
         QSerialPort::EvenParity, QSerialPort::TwoStop};
@@ -40,6 +45,7 @@ int main(int argc, char *argv[])
         settings.setReceiveVisible(false);
         settings.setTransmitVisible(false);
         settings.setAnsiEnabled(true);
+        settings.setShowCescFirmwareTraffic(true);
         settings.setInputMode(InputMode::Hex);
         settings.setChecksumMode(ChecksumMode::Crc8Maxim);
         settings.setLineEnding(LineEnding::CRLF);
@@ -50,6 +56,10 @@ int main(int argc, char *argv[])
             {{QStringLiteral("protocol/command/field"), 42}});
         settings.setWorkspaceDirectory(
             settingsDirectory.filePath(QStringLiteral("workspaces")));
+        settings.setCescFirmwareDirectory(
+            settingsDirectory.filePath(QStringLiteral("firmware")));
+        settings.setCescFirmwarePath(
+            settingsDirectory.filePath(QStringLiteral("firmware/app.bin")));
     }
     {
         AppSettings settings;
@@ -68,7 +78,8 @@ int main(int argc, char *argv[])
             || settings.terminalTimestampEnabled()
             || settings.textEncoding() != TextEncoding::Latin1
             || settings.receiveVisible() || settings.transmitVisible()
-            || !settings.ansiEnabled()) {
+            || !settings.ansiEnabled()
+            || !settings.showCescFirmwareTraffic()) {
             return 9;
         }
         if (settings.inputMode() != InputMode::Hex
@@ -86,6 +97,14 @@ int main(int argc, char *argv[])
         if (settings.workspaceDirectory()
             != settingsDirectory.filePath(QStringLiteral("workspaces"))) {
             return 12;
+        }
+        if (settings.cescFirmwareDirectory()
+            != settingsDirectory.filePath(QStringLiteral("firmware"))) {
+            return 14;
+        }
+        if (settings.cescFirmwarePath()
+            != settingsDirectory.filePath(QStringLiteral("firmware/app.bin"))) {
+            return 15;
         }
     }
     return 0;

@@ -64,9 +64,31 @@ bool ConnectionManager::canSend() const noexcept
         && m_transportType != TransportType::VirtualData;
 }
 
+bool ConnectionManager::firmwareOperationActive() const noexcept
+{
+    return m_firmwareOperationActive;
+}
+
 void ConnectionManager::connectTransport(
     const TransportType type, const TransportConfig &config)
 {
+    connectTransportImpl(type, config, false);
+}
+
+void ConnectionManager::connectTransportForFirmwareRecovery(
+    const TransportType type, const TransportConfig &config)
+{
+    connectTransportImpl(type, config, true);
+}
+
+void ConnectionManager::connectTransportImpl(
+    const TransportType type, const TransportConfig &config,
+    const bool firmwareRecovery)
+{
+    if (m_firmwareOperationActive && !firmwareRecovery) {
+        emit errorOccurred(tr("固件烧录期间不能切换连接"));
+        return;
+    }
     if (m_state == ConnectionState::Connecting
         || m_state == ConnectionState::Connected
         || m_state == ConnectionState::Disconnecting) {
@@ -94,6 +116,20 @@ void ConnectionManager::connectTransport(
 
 void ConnectionManager::disconnectTransport()
 {
+    disconnectTransportImpl(false);
+}
+
+void ConnectionManager::disconnectTransportForFirmwareRecovery()
+{
+    disconnectTransportImpl(true);
+}
+
+void ConnectionManager::disconnectTransportImpl(const bool firmwareRecovery)
+{
+    if (m_firmwareOperationActive && !firmwareRecovery) {
+        emit errorOccurred(tr("固件烧录期间不能主动断开连接"));
+        return;
+    }
     if (!m_transport
         || m_state == ConnectionState::Disconnected
         || m_state == ConnectionState::Disconnecting) {
@@ -103,7 +139,8 @@ void ConnectionManager::disconnectTransport()
     m_transport->close();
 }
 
-bool ConnectionManager::send(const QByteArray &data, QString *errorMessage)
+bool ConnectionManager::send(const QByteArray &data, QString *errorMessage,
+                             const CommunicationTrafficSource source)
 {
     if (data.isEmpty()) {
         if (errorMessage) *errorMessage = tr("发送数据为空");
@@ -125,7 +162,15 @@ bool ConnectionManager::send(const QByteArray &data, QString *errorMessage)
         return false;
     }
     emit dataSent(data);
+    emit monitorDataSent(data, source);
     return true;
+}
+
+void ConnectionManager::setFirmwareOperationActive(const bool active)
+{
+    if (m_firmwareOperationActive == active) return;
+    m_firmwareOperationActive = active;
+    emit firmwareOperationActiveChanged(active);
 }
 
 void ConnectionManager::setTcpServerTarget(const QString &clientId)
@@ -161,9 +206,14 @@ void ConnectionManager::createTransport(const TransportType type)
             this, &ConnectionManager::errorOccurred);
     connect(m_transport, &AbstractTransport::dataReceived, this,
             [this](const QByteArray &data) {
+                const CommunicationTrafficSource source =
+                    m_firmwareOperationActive
+                        ? CommunicationTrafficSource::CescFirmware
+                        : CommunicationTrafficSource::NormalCommunication;
                 m_receiveTotal += static_cast<quint64>(data.size());
                 emit receiveTotalChanged(m_receiveTotal);
                 emit dataReceived(data);
+                emit monitorDataReceived(data, source);
             });
     connect(m_transport, &AbstractTransport::dataWritten, this,
             [this](const qint64 bytes) {

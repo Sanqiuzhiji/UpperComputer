@@ -250,6 +250,8 @@ if(BUILD_TESTING)
         src/app/AppSettings.cpp
         src/app/AppContext.h
         src/app/AppContext.cpp
+        src/services/CescFirmwareUploader.h
+        src/services/CescFirmwareUploader.cpp
         src/services/ConnectionManager.h
         src/services/ConnectionManager.cpp
         src/services/CommunicationCodec.h
@@ -326,6 +328,8 @@ if(BUILD_TESTING)
         src/app/AppSettings.cpp
         src/app/AppContext.h
         src/app/AppContext.cpp
+        src/services/CescFirmwareUploader.h
+        src/services/CescFirmwareUploader.cpp
         src/services/ConnectionManager.h
         src/services/ConnectionManager.cpp
         src/services/CommunicationCodec.h
@@ -417,6 +421,8 @@ if(BUILD_TESTING)
         src/app/AppSettings.cpp
         src/app/AppContext.h
         src/app/AppContext.cpp
+        src/services/CescFirmwareUploader.h
+        src/services/CescFirmwareUploader.cpp
         src/services/ConnectionManager.h
         src/services/ConnectionManager.cpp
         src/services/CommunicationCodec.h

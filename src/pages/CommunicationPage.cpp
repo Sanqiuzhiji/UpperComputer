@@ -1,6 +1,7 @@
 #include "CommunicationPage.h"
 
 #include "app/AppContext.h"
+#include "app/AppSettings.h"
 #include "pages/communication/CommunicationModePanel.h"
 #include "pages/communication/CommunicationMonitorPanel.h"
 #include "pages/communication/HardwareConfigPanel.h"
@@ -65,6 +66,11 @@ CommunicationPage::CommunicationPage(
             manager, &ConnectionManager::setTcpServerTarget);
     connect(manager, &ConnectionManager::stateChanged,
             m_hardwarePanel, &HardwareConfigPanel::setConnectionState);
+    connect(manager, &ConnectionManager::firmwareOperationActiveChanged,
+            m_hardwarePanel,
+            &HardwareConfigPanel::setFirmwareOperationActive);
+    m_hardwarePanel->setFirmwareOperationActive(
+        manager->firmwareOperationActive());
     connect(manager, &ConnectionManager::tcpClientsChanged,
             m_hardwarePanel, &HardwareConfigPanel::setTcpClients);
     ReceiveDataPipeline *pipeline = context->receiveDataPipeline();
@@ -81,8 +87,13 @@ CommunicationPage::CommunicationPage(
             this, [this](const QString &message) {
                 notify(message, NotificationType::Warning);
             });
-    connect(manager, &ConnectionManager::dataSent, this,
-            [this](const QByteArray &bytes) {
+    connect(manager, &ConnectionManager::monitorDataSent, this,
+            [this](const QByteArray &bytes,
+                   const CommunicationTrafficSource source) {
+                if (source == CommunicationTrafficSource::CescFirmware
+                    && !m_context->settings()->showCescFirmwareTraffic()) {
+                    return;
+                }
                 m_monitorPanel->addEntry(DataDirection::Transmit, bytes);
             });
     connect(manager, &ConnectionManager::errorOccurred, this,

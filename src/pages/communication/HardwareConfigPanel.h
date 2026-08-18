@@ -27,6 +27,7 @@ public:
 
 public slots:
     void setConnectionState(ConnectionState state);
+    void setFirmwareOperationActive(bool active);
     void setTcpClients(const QStringList &clients);
     void refreshSerialPorts();
 
@@ -80,4 +81,5 @@ private:
     ConnectionState m_state{ConnectionState::Disconnected};
     bool m_refreshing{};
     bool m_firstRefresh{true};
+    bool m_firmwareOperationActive{};
 };

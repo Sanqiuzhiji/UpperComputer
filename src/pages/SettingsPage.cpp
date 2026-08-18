@@ -61,6 +61,53 @@ SettingsPage::SettingsPage(AppContext *context, QWidget *parent)
         tr("用户信息卡片"), tr("在导航栏顶部显示软件信息。"), userCard));
     connect(userCard, &QCheckBox::toggled, this, &SettingsPage::userCardVisibilityChanged);
 
+    auto *showCescTraffic = new QCheckBox(tr("显示"), this);
+    showCescTraffic->setChecked(m_settings->showCescFirmwareTraffic());
+    contentLayout->addWidget(createSettingCard(
+        tr("显示 CESC 烧录通信数据"),
+        tr("在 Communication 中显示 CESC 固件烧录过程中的底层收发数据，仅建议协议调试时开启。"),
+        showCescTraffic));
+    connect(showCescTraffic, &QCheckBox::toggled,
+            m_settings, &AppSettings::setShowCescFirmwareTraffic);
+    connect(m_settings, &AppSettings::showCescFirmwareTrafficChanged,
+            showCescTraffic, &QCheckBox::setChecked);
+
+    auto *defaultFirmwareControl = new QWidget(this);
+    auto *defaultFirmwareLayout = new QHBoxLayout(defaultFirmwareControl);
+    defaultFirmwareLayout->setContentsMargins(0, 0, 0, 0);
+    defaultFirmwareLayout->setSpacing(8);
+    auto *defaultFirmwarePath = new QLineEdit(
+        m_settings->cescFirmwarePath(), defaultFirmwareControl);
+    defaultFirmwarePath->setPlaceholderText(tr("未设置默认 .bin 固件"));
+    defaultFirmwarePath->setMinimumWidth(300);
+    auto *browseDefaultFirmware = new QPushButton(
+        tr("浏览..."), defaultFirmwareControl);
+    defaultFirmwareLayout->addWidget(defaultFirmwarePath, 1);
+    defaultFirmwareLayout->addWidget(browseDefaultFirmware);
+    contentLayout->addWidget(createSettingCard(
+        tr("CESC 默认固件"),
+        tr("CESC Tool 启动时自动载入此 .bin 文件，仍会在烧录前重新检查文件。"),
+        defaultFirmwareControl));
+    connect(defaultFirmwarePath, &QLineEdit::editingFinished,
+            this, [this, defaultFirmwarePath] {
+                m_settings->setCescFirmwarePath(
+                    defaultFirmwarePath->text());
+                defaultFirmwarePath->setText(
+                    m_settings->cescFirmwarePath());
+            });
+    connect(browseDefaultFirmware, &QPushButton::clicked,
+            this, [this, defaultFirmwarePath] {
+                const QString path = QFileDialog::getOpenFileName(
+                    this, tr("选择 CESC 默认固件"),
+                    m_settings->cescFirmwareDirectory(),
+                    tr("固件文件 (*.bin);;所有文件 (*)"));
+                if (path.isEmpty()) return;
+                m_settings->setCescFirmwarePath(path);
+                defaultFirmwarePath->setText(path);
+            });
+    connect(m_settings, &AppSettings::cescFirmwarePathChanged,
+            defaultFirmwarePath, &QLineEdit::setText);
+
     auto *workspacePathControl = new QWidget(this);
     auto *workspacePathLayout = new QHBoxLayout(workspacePathControl);
     workspacePathLayout->setContentsMargins(0, 0, 0, 0);

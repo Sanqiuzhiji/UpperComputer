@@ -27,11 +27,18 @@ public:
     [[nodiscard]] quint64 transmitTotal() const noexcept;
     [[nodiscard]] TransportType transportType() const noexcept;
     [[nodiscard]] bool canSend() const noexcept;
+    [[nodiscard]] bool firmwareOperationActive() const noexcept;
 
 public slots:
     void connectTransport(TransportType type, const TransportConfig &config);
     void disconnectTransport();
-    bool send(const QByteArray &data, QString *errorMessage = nullptr);
+    bool send(const QByteArray &data, QString *errorMessage = nullptr,
+              CommunicationTrafficSource source =
+                  CommunicationTrafficSource::NormalCommunication);
+    void setFirmwareOperationActive(bool active);
+    void connectTransportForFirmwareRecovery(
+        TransportType type, const TransportConfig &config);
+    void disconnectTransportForFirmwareRecovery();
     void setTcpServerTarget(const QString &clientId);
 
 signals:
@@ -44,10 +51,19 @@ signals:
     void transmitTotalChanged(quint64 bytes);
     void dataReceived(const QByteArray &data);
     void dataSent(const QByteArray &data);
+    void monitorDataReceived(const QByteArray &data,
+                             CommunicationTrafficSource source);
+    void monitorDataSent(const QByteArray &data,
+                         CommunicationTrafficSource source);
+    void firmwareOperationActiveChanged(bool active);
     void errorOccurred(const QString &message);
     void tcpClientsChanged(const QStringList &clients);
 
 private:
+    void connectTransportImpl(TransportType type,
+                              const TransportConfig &config,
+                              bool firmwareRecovery);
+    void disconnectTransportImpl(bool firmwareRecovery);
     void createTransport(TransportType type);
     void setState(ConnectionState state);
     void setDeviceName(const QString &name);
@@ -69,4 +85,5 @@ private:
     quint64 m_transmitTotal{};
     quint64 m_lastReceiveTotal{};
     quint64 m_lastTransmitTotal{};
+    bool m_firmwareOperationActive{};
 };

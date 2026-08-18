@@ -38,6 +38,7 @@ public:
     [[nodiscard]] bool receiveVisible() const noexcept;
     [[nodiscard]] bool transmitVisible() const noexcept;
     [[nodiscard]] bool ansiEnabled() const noexcept;
+    [[nodiscard]] bool showCescFirmwareTraffic() const noexcept;
     [[nodiscard]] InputMode inputMode() const noexcept;
     [[nodiscard]] ChecksumMode checksumMode() const noexcept;
     [[nodiscard]] LineEnding lineEnding() const noexcept;
@@ -46,6 +47,8 @@ public:
     [[nodiscard]] QString customCommandId() const;
     [[nodiscard]] QVariantMap customFieldDrafts() const;
     [[nodiscard]] QString workspaceDirectory() const;
+    [[nodiscard]] QString cescFirmwareDirectory() const;
+    [[nodiscard]] QString cescFirmwarePath() const;
     [[nodiscard]] static QString defaultWorkspaceDirectory();
 
 public slots:
@@ -71,6 +74,7 @@ public slots:
     void setReceiveVisible(bool visible);
     void setTransmitVisible(bool visible);
     void setAnsiEnabled(bool enabled);
+    void setShowCescFirmwareTraffic(bool enabled);
     void setInputMode(InputMode mode);
     void setChecksumMode(ChecksumMode mode);
     void setLineEnding(LineEnding ending);
@@ -79,9 +83,13 @@ public slots:
     void setCustomCommandId(const QString &commandId);
     void setCustomFieldDrafts(const QVariantMap &drafts);
     void setWorkspaceDirectory(const QString &directory);
+    void setCescFirmwareDirectory(const QString &directory);
+    void setCescFirmwarePath(const QString &path);
 
 signals:
     void workspaceDirectoryChanged(const QString &directory);
+    void showCescFirmwareTrafficChanged(bool enabled);
+    void cescFirmwarePathChanged(const QString &path);
 
 private:
     void load();
@@ -109,6 +117,7 @@ private:
     bool m_receiveVisible{true};
     bool m_transmitVisible{true};
     bool m_ansiEnabled{};
+    bool m_showCescFirmwareTraffic{};
     InputMode m_inputMode{InputMode::Text};
     ChecksumMode m_checksumMode{ChecksumMode::None};
     LineEnding m_lineEnding{LineEnding::None};
@@ -117,4 +126,6 @@ private:
     QString m_customCommandId;
     QVariantMap m_customFieldDrafts;
     QString m_workspaceDirectory;
+    QString m_cescFirmwareDirectory;
+    QString m_cescFirmwarePath;
 };

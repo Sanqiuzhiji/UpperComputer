@@ -29,7 +29,7 @@ ReceiveDataPipeline::ReceiveDataPipeline(
       m_epochBaseUs(QDateTime::currentMSecsSinceEpoch() * 1000)
 {
     m_monotonicClock.start();
-    connect(connectionManager, &ConnectionManager::dataReceived,
+    connect(connectionManager, &ConnectionManager::monitorDataReceived,
             this, &ReceiveDataPipeline::handleData);
     connect(protocolRepository, &ProtocolRepository::protocolLibraryChanged,
             this, &ReceiveDataPipeline::rebuildParser);
@@ -75,9 +75,14 @@ void ReceiveDataPipeline::setCustomProtocol(
     rebuildParser();
 }
 
-void ReceiveDataPipeline::handleData(const QByteArray &data)
+void ReceiveDataPipeline::handleData(
+    const QByteArray &data, const CommunicationTrafficSource source)
 {
     if (data.isEmpty()) return;
+    if (source == CommunicationTrafficSource::CescFirmware
+        && !m_settings->showCescFirmwareTraffic()) {
+        return;
+    }
     const qint64 nowUs = timestampUs();
     emit rawDataReceived(nowUs, data);
     if (m_connectionManager->transportType()

@@ -3,6 +3,7 @@
 #include "app/AppSettings.h"
 #include "services/ChannelDataHub.h"
 #include "services/ConnectionManager.h"
+#include "services/CescFirmwareUploader.h"
 #include "services/ProtocolRepository.h"
 #include "services/ReceiveDataPipeline.h"
 #include "theme/IconManager.h"
@@ -14,6 +15,8 @@ AppContext::AppContext(QObject *parent)
     : QObject(parent),
       m_settings(new AppSettings(this)),
       m_connectionManager(new ConnectionManager(this)),
+      m_cescFirmwareUploader(new CescFirmwareUploader(
+          m_connectionManager, m_settings, this)),
       m_protocolRepository(new ProtocolRepository(
           this, QDir(m_settings->workspaceDirectory())
                     .filePath(QStringLiteral("protocols")))),
@@ -47,6 +50,19 @@ AppSettings *AppContext::settings() const noexcept
 ConnectionManager *AppContext::connectionManager() const noexcept
 {
     return m_connectionManager;
+}
+
+AppContext::~AppContext()
+{
+    // The uploader keeps non-owning pointers to settings and connection.
+    // Destroy it before QObject tears down the AppContext children.
+    delete m_cescFirmwareUploader;
+    m_cescFirmwareUploader = nullptr;
+}
+
+CescFirmwareUploader *AppContext::cescFirmwareUploader() const noexcept
+{
+    return m_cescFirmwareUploader;
 }
 
 ThemeManager *AppContext::themeManager() const noexcept

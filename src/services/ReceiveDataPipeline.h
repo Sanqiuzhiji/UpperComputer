@@ -46,7 +46,8 @@ signals:
     void parseFailed(const QString &message);
 
 private:
-    void handleData(const QByteArray &data);
+    void handleData(const QByteArray &data,
+                    CommunicationTrafficSource source);
     void publishVirtualData(qint64 timestampUs, const QByteArray &data);
     void rebuildParser();
     [[nodiscard]] qint64 timestampUs() const;

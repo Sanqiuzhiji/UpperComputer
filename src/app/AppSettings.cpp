@@ -2,6 +2,7 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QFileInfo>
 
 namespace {
 constexpr auto kThemeModeKey = "appearance/themeMode";
@@ -40,6 +41,8 @@ constexpr auto kEncodingKey = "connection/terminal/encoding";
 constexpr auto kReceiveVisibleKey = "connection/terminal/receiveVisible";
 constexpr auto kTransmitVisibleKey = "connection/terminal/transmitVisible";
 constexpr auto kAnsiKey = "connection/terminal/ansi";
+constexpr auto kShowCescFirmwareTrafficKey =
+    "connection/terminal/showCescFirmwareTraffic";
 constexpr auto kInputModeKey = "connection/send/inputMode";
 constexpr auto kChecksumModeKey = "connection/send/checksumMode";
 constexpr auto kLineEndingKey = "connection/send/lineEnding";
@@ -48,6 +51,8 @@ constexpr auto kRawHexDraftKey = "connection/send/rawHexDraft";
 constexpr auto kCustomCommandKey = "connection/send/customCommandId";
 constexpr auto kCustomFieldDraftsKey = "connection/send/customFieldDrafts";
 constexpr auto kWorkspaceDirectoryKey = "workspace/directory";
+constexpr auto kCescFirmwareDirectoryKey = "cesc/firmwareDirectory";
+constexpr auto kCescFirmwarePathKey = "cesc/firmwarePath";
 
 template<typename Enum>
 int enumValue(const Enum value)
@@ -170,6 +175,11 @@ bool AppSettings::transmitVisible() const noexcept
 bool AppSettings::ansiEnabled() const noexcept
 {
     return m_ansiEnabled;
+}
+
+bool AppSettings::showCescFirmwareTraffic() const noexcept
+{
+    return m_showCescFirmwareTraffic;
 }
 
 InputMode AppSettings::inputMode() const noexcept
@@ -404,6 +414,24 @@ void AppSettings::setAnsiEnabled(const bool enabled)
     m_store.setValue(QLatin1String(kAnsiKey), enabled);
 }
 
+QString AppSettings::cescFirmwareDirectory() const
+{
+    return m_cescFirmwareDirectory;
+}
+
+QString AppSettings::cescFirmwarePath() const
+{
+    return m_cescFirmwarePath;
+}
+
+void AppSettings::setShowCescFirmwareTraffic(const bool enabled)
+{
+    if (m_showCescFirmwareTraffic == enabled) return;
+    m_showCescFirmwareTraffic = enabled;
+    m_store.setValue(QLatin1String(kShowCescFirmwareTrafficKey), enabled);
+    emit showCescFirmwareTrafficChanged(enabled);
+}
+
 void AppSettings::setInputMode(const InputMode mode)
 {
     if (m_inputMode == mode) return;
@@ -462,6 +490,27 @@ void AppSettings::setWorkspaceDirectory(const QString &directory)
     m_workspaceDirectory = target;
     m_store.setValue(QLatin1String(kWorkspaceDirectoryKey), target);
     emit workspaceDirectoryChanged(target);
+}
+
+void AppSettings::setCescFirmwareDirectory(const QString &directory)
+{
+    const QString normalized = QDir::cleanPath(directory.trimmed());
+    if (m_cescFirmwareDirectory == normalized) return;
+    m_cescFirmwareDirectory = normalized;
+    m_store.setValue(QLatin1String(kCescFirmwareDirectoryKey), normalized);
+}
+
+void AppSettings::setCescFirmwarePath(const QString &path)
+{
+    const QString normalized = path.trimmed().isEmpty()
+        ? QString() : QDir::cleanPath(path.trimmed());
+    if (m_cescFirmwarePath == normalized) return;
+    m_cescFirmwarePath = normalized;
+    m_store.setValue(QLatin1String(kCescFirmwarePathKey), normalized);
+    if (!normalized.isEmpty()) {
+        setCescFirmwareDirectory(QFileInfo(normalized).absolutePath());
+    }
+    emit cescFirmwarePathChanged(normalized);
 }
 
 void AppSettings::load()
@@ -573,6 +622,8 @@ void AppSettings::load()
     m_transmitVisible =
         m_store.value(QLatin1String(kTransmitVisibleKey), true).toBool();
     m_ansiEnabled = m_store.value(QLatin1String(kAnsiKey), false).toBool();
+    m_showCescFirmwareTraffic = m_store.value(
+        QLatin1String(kShowCescFirmwareTrafficKey), false).toBool();
     m_inputMode = static_cast<InputMode>(qBound(
         enumValue(InputMode::Text),
         m_store.value(QLatin1String(kInputModeKey),
@@ -600,4 +651,12 @@ void AppSettings::load()
         m_store.value(
             QLatin1String(kWorkspaceDirectoryKey),
             defaultWorkspaceDirectory()).toString());
+    m_cescFirmwareDirectory = QDir::cleanPath(m_store.value(
+        QLatin1String(kCescFirmwareDirectoryKey),
+        m_workspaceDirectory).toString());
+    m_cescFirmwarePath = QDir::cleanPath(m_store.value(
+        QLatin1String(kCescFirmwarePathKey), QString()).toString());
+    if (m_cescFirmwarePath == QStringLiteral(".")) {
+        m_cescFirmwarePath.clear();
+    }
 }
