@@ -27,6 +27,8 @@ find_package(Qt6 6.11 REQUIRED COMPONENTS
 
 set(TELEMETRY_SOURCES
     src/models/TelemetryTypes.h
+    src/services/BuiltInStreamParser.h
+    src/services/BuiltInStreamParser.cpp
     src/services/ChannelDataHub.h
     src/services/ChannelDataHub.cpp
     src/services/ReceiveDataPipeline.h
@@ -170,6 +172,25 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+    qt_add_executable(BuiltInStreamParserTest
+        tests/BuiltInStreamParserTest.cpp
+        src/models/ConnectionTypes.h
+        src/models/ProtocolDefinition.h
+        src/services/BuiltInStreamParser.h
+        src/services/BuiltInStreamParser.cpp
+    )
+    target_include_directories(BuiltInStreamParserTest PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_link_libraries(BuiltInStreamParserTest PRIVATE
+        Qt6::Core
+        Qt6::SerialPort
+    )
+    if(MSVC)
+        target_compile_options(BuiltInStreamParserTest PRIVATE
+            /W4 /utf-8 /permissive-)
+    endif()
+    add_test(NAME BuiltInStreamParserTest COMMAND BuiltInStreamParserTest)
+
     qt_add_executable(ChecksumUtilsTest
         tests/ChecksumUtilsTest.cpp
         src/utils/ChecksumUtils.h

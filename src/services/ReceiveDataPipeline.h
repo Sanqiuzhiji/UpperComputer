@@ -9,6 +9,7 @@
 #include "models/ProtocolDefinition.h"
 
 class AppSettings;
+class BuiltInStreamParser;
 class ChannelDataHub;
 class ConnectionManager;
 class CustomBinaryCodec;
@@ -60,6 +61,7 @@ private:
     QString m_protocolId;
     QString m_receiveMessageId;
     std::unique_ptr<CustomBinaryCodec> m_customBinaryParser;
+    std::unique_ptr<BuiltInStreamParser> m_builtInParser;
     QElapsedTimer m_monotonicClock;
     qint64 m_epochBaseUs{};
 };

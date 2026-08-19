@@ -2,6 +2,7 @@
 
 #include "app/AppSettings.h"
 #include "services/ChannelDataHub.h"
+#include "services/BuiltInStreamParser.h"
 #include "services/ConnectionManager.h"
 #include "services/CustomBinaryCodec.h"
 #include "services/ProtocolRepository.h"
@@ -90,8 +91,18 @@ void ReceiveDataPipeline::handleData(
         publishVirtualData(nowUs, data);
         return;
     }
-    if (m_parserMode != ParserMode::CustomBinary
-        || !m_customBinaryParser) {
+    if (m_builtInParser) {
+        QList<ParsedMessage> messages;
+        QString error;
+        const bool valid = m_builtInParser->parse(data, &messages, &error);
+        if (!valid) emit parseFailed(error);
+        if (messages.isEmpty()) return;
+        const QString protocolId = m_builtInParser->protocolId();
+        m_channelDataHub->publish(nowUs, protocolId, messages);
+        emit parsedMessagesReceived(nowUs, protocolId, messages);
+        return;
+    }
+    if (m_parserMode != ParserMode::CustomBinary || !m_customBinaryParser) {
         return;
     }
     QList<ParsedMessage> messages;
@@ -157,6 +168,7 @@ void ReceiveDataPipeline::publishVirtualData(
 void ReceiveDataPipeline::rebuildParser()
 {
     m_customBinaryParser.reset();
+    m_builtInParser.reset();
     QList<ProtocolDefinition> definitions =
         m_protocolRepository->communicationDefinitions();
     QSet<QString> validChannelIds;
@@ -181,6 +193,11 @@ void ReceiveDataPipeline::rebuildParser()
         }
     }
     m_channelDataHub->retainChannels(validChannelIds);
+    if (m_parserMode == ParserMode::FireWater
+        || m_parserMode == ParserMode::JustFloat) {
+        m_builtInParser = std::make_unique<BuiltInStreamParser>(m_parserMode);
+        return;
+    }
     if (m_parserMode != ParserMode::CustomBinary) return;
     for (ProtocolDefinition &protocol : definitions) {
         if (protocol.id != m_protocolId) continue;
