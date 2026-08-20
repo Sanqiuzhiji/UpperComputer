@@ -19,6 +19,9 @@ public:
 private slots:
     void chooseFirmware();
     void startUpload();
+    void queryAngle();
+    void startAngleStream();
+    void stopAngleStream();
 
 private:
     void updateActions();
@@ -40,6 +43,13 @@ private:
     QPushButton *m_uploadButton{};
     QPushButton *m_cancelButton{};
     QPushButton *m_connectionButton{};
+    QLabel *m_angleValue{};
+    QLabel *m_rawAngleValue{};
+    QLabel *m_sensorStatusValue{};
+    QLabel *m_streamStatus{};
+    QPushButton *m_queryAngleButton{};
+    QPushButton *m_telemetryButton{};
+    quint16 m_angleStreamId{};
     bool m_firmwareValid{};
     qint64 m_firmwareSize{};
 };

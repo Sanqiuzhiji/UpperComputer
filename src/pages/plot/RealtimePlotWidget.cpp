@@ -35,7 +35,8 @@ RealtimePlotWidget::RealtimePlotWidget(
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
     setPalette(PlotTheme::palette(context->themeManager()->mode()));
-    m_refreshTimer->setInterval(33);
+    m_refreshTimer->setTimerType(Qt::PreciseTimer);
+    m_refreshTimer->setInterval(16);
     connect(m_refreshTimer, &QTimer::timeout,
             this, &RealtimePlotWidget::refreshData);
     connect(context->themeManager(), &ThemeManager::themeChanged,
@@ -56,6 +57,7 @@ void RealtimePlotWidget::setChannelStyles(
 {
     m_styles = styles;
     m_visibleSamples.clear();
+    m_yRangeInitialized = false;
     refreshData();
 }
 
@@ -151,20 +153,31 @@ void RealtimePlotWidget::updateYRange(const bool immediate)
         }
     }
     if (minimum > maximum) return;
-    double range = maximum - minimum;
-    if (range < 1.0e-12) range = qMax(1.0, std::abs(maximum) * 0.1);
-    const double targetMinimum = minimum - range * 0.08;
-    const double targetMaximum = maximum + range * 0.08;
-    if (immediate || targetMinimum < m_minimumY) {
+    const double range = qMax(1.0, maximum - minimum);
+    double center = (minimum + maximum) * 0.5;
+    if (m_yRangeInitialized && !immediate) {
+        const double currentCenter = (m_minimumY + m_maximumY) * 0.5;
+        const double currentRange = m_maximumY - m_minimumY;
+        const double centerDeadband = qMax(0.1, currentRange * 0.1);
+        if (std::abs(center - currentCenter) < centerDeadband) {
+            center = currentCenter;
+        }
+    }
+    const double paddedRange = range * 1.16;
+    const double targetMinimum = center - paddedRange * 0.5;
+    const double targetMaximum = center + paddedRange * 0.5;
+    const bool initialize = immediate || !m_yRangeInitialized;
+    if (initialize || targetMinimum < m_minimumY) {
         m_minimumY = targetMinimum;
     } else {
         m_minimumY += (targetMinimum - m_minimumY) * 0.12;
     }
-    if (immediate || targetMaximum > m_maximumY) {
+    if (initialize || targetMaximum > m_maximumY) {
         m_maximumY = targetMaximum;
     } else {
         m_maximumY += (targetMaximum - m_maximumY) * 0.12;
     }
+    m_yRangeInitialized = true;
 }
 
 QRectF RealtimePlotWidget::plotRect() const
@@ -714,6 +727,11 @@ void RealtimePlotWidget::mouseDoubleClickEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton
         && plotRect().contains(event->position())) {
+        if (m_styles.isEmpty()) {
+            openChannelDialog();
+            event->accept();
+            return;
+        }
         m_panning = false;
         m_draggingLatestLine = false;
         m_draggedTracer = nullptr;

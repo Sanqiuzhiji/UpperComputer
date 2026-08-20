@@ -28,6 +28,7 @@ public:
     [[nodiscard]] TransportType transportType() const noexcept;
     [[nodiscard]] bool canSend() const noexcept;
     [[nodiscard]] bool firmwareOperationActive() const noexcept;
+    [[nodiscard]] bool cescNativeActive() const noexcept;
 
 public slots:
     void connectTransport(TransportType type, const TransportConfig &config);
@@ -36,6 +37,7 @@ public slots:
               CommunicationTrafficSource source =
                   CommunicationTrafficSource::NormalCommunication);
     void setFirmwareOperationActive(bool active);
+    void setCescNativeActive(bool active);
     void connectTransportForFirmwareRecovery(
         TransportType type, const TransportConfig &config);
     void disconnectTransportForFirmwareRecovery();
@@ -86,4 +88,5 @@ private:
     quint64 m_lastReceiveTotal{};
     quint64 m_lastTransmitTotal{};
     bool m_firmwareOperationActive{};
+    bool m_cescNativeActive{};
 };

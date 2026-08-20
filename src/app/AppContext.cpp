@@ -4,6 +4,10 @@
 #include "services/ChannelDataHub.h"
 #include "services/ConnectionManager.h"
 #include "services/CescFirmwareUploader.h"
+#include "services/cesc/CescSession.h"
+#include "services/cesc/CescSystemClient.h"
+#include "services/cesc/CescSensorClient.h"
+#include "services/cesc/CescTelemetryClient.h"
 #include "services/ProtocolRepository.h"
 #include "services/ReceiveDataPipeline.h"
 #include "theme/IconManager.h"
@@ -15,8 +19,9 @@ AppContext::AppContext(QObject *parent)
     : QObject(parent),
       m_settings(new AppSettings(this)),
       m_connectionManager(new ConnectionManager(this)),
+      m_cescSession(new CescSession(m_connectionManager, this)),
       m_cescFirmwareUploader(new CescFirmwareUploader(
-          m_connectionManager, m_settings, this)),
+          m_connectionManager, m_settings, m_cescSession, this)),
       m_protocolRepository(new ProtocolRepository(
           this, QDir(m_settings->workspaceDirectory())
                     .filePath(QStringLiteral("protocols")))),
@@ -30,6 +35,10 @@ AppContext::AppContext(QObject *parent)
       m_themeManager(new ThemeManager(m_settings, this)),
       m_iconManager(new IconManager(m_themeManager, this))
 {
+    m_cescSystemClient = new CescSystemClient(m_cescSession, this);
+    m_cescSensorClient = new CescSensorClient(m_cescSession, this);
+    m_cescTelemetryClient = new CescTelemetryClient(
+        m_cescSession, m_channelDataHub, this);
     connect(m_protocolRepository,
             &ProtocolRepository::notificationRequested,
             this, &AppContext::notify,
@@ -64,6 +73,11 @@ CescFirmwareUploader *AppContext::cescFirmwareUploader() const noexcept
 {
     return m_cescFirmwareUploader;
 }
+
+CescSession *AppContext::cescSession() const noexcept { return m_cescSession; }
+CescSystemClient *AppContext::cescSystemClient() const noexcept { return m_cescSystemClient; }
+CescSensorClient *AppContext::cescSensorClient() const noexcept { return m_cescSensorClient; }
+CescTelemetryClient *AppContext::cescTelemetryClient() const noexcept { return m_cescTelemetryClient; }
 
 ThemeManager *AppContext::themeManager() const noexcept
 {

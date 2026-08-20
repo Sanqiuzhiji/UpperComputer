@@ -85,6 +85,7 @@ private:
     qint64 m_windowDurationUs{10000000};
     double m_minimumY{-1.0};
     double m_maximumY{1.0};
+    bool m_yRangeInitialized{};
     bool m_paused{};
     bool m_followLatest{true};
     bool m_autoY{true};

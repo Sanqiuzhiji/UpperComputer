@@ -35,7 +35,8 @@ enum class DataDirection {
 
 enum class CommunicationTrafficSource {
     NormalCommunication,
-    CescFirmware
+    CescFirmware,
+    CescNative
 };
 
 enum class TerminalDisplayMode {

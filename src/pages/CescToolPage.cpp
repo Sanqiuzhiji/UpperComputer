@@ -5,6 +5,9 @@
 #include "models/AppTypes.h"
 #include "services/CescFirmwareUploader.h"
 #include "services/ConnectionManager.h"
+#include "services/cesc/CescSession.h"
+#include "services/cesc/CescSensorClient.h"
+#include "services/cesc/CescTelemetryClient.h"
 
 #include <QFile>
 #include <QFileDialog>
@@ -59,6 +62,38 @@ CescToolPage::CescToolPage(AppContext *context, QWidget *parent)
     deviceLayout->addWidget(m_connectionButton, 1, 4, 2, 1);
     layout->addWidget(deviceCard);
 
+    auto *angleCard = new QFrame(this);
+    angleCard->setProperty("card", true);
+    auto *angleLayout = new QGridLayout(angleCard);
+    angleLayout->setContentsMargins(24, 18, 24, 18);
+    angleLayout->setHorizontalSpacing(18);
+    auto *angleTitle = new QLabel(tr("Angle sensor and telemetry"), angleCard);
+    angleTitle->setObjectName(QStringLiteral("sectionTitle"));
+    angleLayout->addWidget(angleTitle, 0, 0, 1, 6);
+    angleLayout->addWidget(new QLabel(tr("Angle"), angleCard), 1, 0);
+    angleLayout->addWidget(new QLabel(tr("Raw"), angleCard), 1, 1);
+    angleLayout->addWidget(new QLabel(tr("Sensor status"), angleCard), 1, 2);
+    m_angleValue = new QLabel(QStringLiteral("-- deg"), angleCard);
+    m_rawAngleValue = new QLabel(QStringLiteral("--"), angleCard);
+    m_sensorStatusValue = new QLabel(tr("Unknown"), angleCard);
+    m_streamStatus = new QLabel(tr("Stopped"), angleCard);
+    angleLayout->addWidget(m_angleValue, 2, 0);
+    angleLayout->addWidget(m_rawAngleValue, 2, 1);
+    angleLayout->addWidget(m_sensorStatusValue, 2, 2);
+    angleLayout->addWidget(m_streamStatus, 2, 3);
+    m_queryAngleButton = new QPushButton(tr("Read once"), angleCard);
+    m_telemetryButton = new QPushButton(tr("Start telemetry"), angleCard);
+    m_telemetryButton->setProperty("accent", true);
+    angleLayout->addWidget(m_queryAngleButton, 1, 4, 2, 1);
+    angleLayout->addWidget(m_telemetryButton, 1, 5, 2, 1);
+    auto *plotHint = new QLabel(
+        tr("After telemetry starts, open Plot and select the CESC V1 channels "
+           "shaft_angle, shaft_angle_raw or shaft_sensor_status."), angleCard);
+    plotHint->setWordWrap(true);
+    plotHint->setProperty("muted", true);
+    angleLayout->addWidget(plotHint, 3, 0, 1, 6);
+    layout->addWidget(angleCard);
+
     auto *card = new QFrame(this);
     card->setProperty("card", true);
     auto *cardLayout = new QVBoxLayout(card);
@@ -104,6 +139,38 @@ CescToolPage::CescToolPage(AppContext *context, QWidget *parent)
     connect(m_chooseButton, &QPushButton::clicked, this, &CescToolPage::chooseFirmware);
     connect(m_uploadButton, &QPushButton::clicked, this, &CescToolPage::startUpload);
     connect(m_cancelButton, &QPushButton::clicked, m_uploader, &CescFirmwareUploader::cancel);
+    connect(m_queryAngleButton, &QPushButton::clicked,
+            this, &CescToolPage::queryAngle);
+    connect(m_telemetryButton, &QPushButton::clicked, this, [this] {
+        if (m_angleStreamId != 0U
+            || m_context->cescTelemetryClient()->activeStreamId() != 0U) {
+            stopAngleStream();
+        } else {
+            startAngleStream();
+        }
+    });
+    connect(context->cescSensorClient(), &CescSensorClient::sampleReceived,
+            this, [this](const CescSensorClient::Sample &sample) {
+                m_angleValue->setText(QStringLiteral("%1 deg").arg(sample.degrees, 0, 'f', 2));
+                m_rawAngleValue->setText(QString::number(sample.rawAngle));
+                m_sensorStatusValue->setText(QString::number(sample.status));
+            });
+    connect(context->cescSensorClient(), &CescSensorClient::commandFailed,
+            this, [this](const QString &message) {
+                m_context->notify(message, NotificationType::Error);
+            });
+    connect(context->cescTelemetryClient(), &CescTelemetryClient::subscribed,
+            this, [this](quint16 streamId) {
+                m_angleStreamId = streamId;
+                m_streamStatus->setText(tr("Streaming (ID %1, 100 Hz)").arg(streamId));
+                updateActions();
+            });
+    connect(context->cescTelemetryClient(), &CescTelemetryClient::commandFailed,
+            this, [this](const QString &message) {
+                m_streamStatus->setText(message);
+                m_context->notify(message, NotificationType::Error);
+                updateActions();
+            });
     connect(m_connectionButton, &QPushButton::clicked, this, [this, manager] {
         if (manager->state() == ConnectionState::Connected
             || manager->state() == ConnectionState::Connecting) {
@@ -121,11 +188,24 @@ CescToolPage::CescToolPage(AppContext *context, QWidget *parent)
         updateConnectionUi(); updateActions();
         if (m_context->connectionManager()->state()
             == ConnectionState::Connected) {
-            m_uploader->requestFirmwareVersion();
+            m_context->cescSession()->setEnabled(true);
+        } else if (m_context->connectionManager()->state()
+                   == ConnectionState::Disconnected) {
+            m_angleStreamId = 0U;
+            m_streamStatus->setText(tr("Stopped"));
         }
     });
     connect(manager, &ConnectionManager::deviceNameChanged,
             this, [this] { updateConnectionUi(); });
+    connect(context->cescSession(), &CescSession::stateChanged, this,
+            [this](CescSession::State state) {
+                updateConnectionUi();
+                updateActions();
+                if (state == CescSession::State::Ready
+                    && !m_uploader->isBusy()) {
+                    m_uploader->requestFirmwareVersion();
+                }
+            });
     connect(m_uploader, &CescFirmwareUploader::stateChanged, this,
             [this](CescFirmwareUploader::State state, int progress,
                    const QString &status) {
@@ -157,8 +237,41 @@ CescToolPage::CescToolPage(AppContext *context, QWidget *parent)
     updateConnectionUi();
     updateActions();
     if (manager->state() == ConnectionState::Connected) {
-        m_uploader->requestFirmwareVersion();
+        context->cescSession()->setEnabled(true);
+        if (context->cescSession()->isReady()) {
+            m_uploader->requestFirmwareVersion();
+            m_angleStreamId = context->cescTelemetryClient()->activeStreamId();
+        }
     }
+}
+
+void CescToolPage::queryAngle()
+{
+    if (!m_context->cescSession()->isReady()) return;
+    m_context->cescSensorClient()->getSample();
+}
+
+void CescToolPage::startAngleStream()
+{
+    if (!m_context->cescSession()->isReady()) return;
+    m_angleStreamId = m_context->cescTelemetryClient()->activeStreamId();
+    if (m_angleStreamId != 0U) return;
+    m_streamStatus->setText(tr("Starting..."));
+    m_context->cescTelemetryClient()->enumerate();
+    m_context->cescTelemetryClient()->subscribe({0U, 1U, 2U}, 10000U, 1U);
+    updateActions();
+}
+
+void CescToolPage::stopAngleStream()
+{
+    if (m_angleStreamId != 0U) {
+        m_context->cescTelemetryClient()->unsubscribe(m_angleStreamId);
+        m_angleStreamId = 0U;
+    } else if (m_context->cescSession()->isReady()) {
+        m_context->cescTelemetryClient()->stopAll();
+    }
+    m_streamStatus->setText(tr("Stopped"));
+    updateActions();
 }
 
 void CescToolPage::chooseFirmware()
@@ -249,7 +362,11 @@ void CescToolPage::updateConnectionUi()
     m_portValue->setText(serialConnected ? manager->deviceName()
                                          : (serial.portName.isEmpty() ? tr("未选择") : serial.portName));
     m_baudValue->setText(QString::number(serial.baudRate));
-    m_connectionValue->setText(serialConnected ? tr("已连接") : tr("未连接"));
+    const auto sessionState = m_context->cescSession()->state();
+    m_connectionValue->setText(!serialConnected ? tr("传输未连接")
+        : sessionState == CescSession::State::Ready ? tr("CESC 已就绪")
+        : sessionState == CescSession::State::Negotiating ? tr("CESC 协商中")
+        : tr("传输已连接 / CESC 未就绪"));
     m_versionValue->setText(m_uploader->firmwareVersion().isEmpty()
         ? tr("未知") : m_uploader->firmwareVersion());
     m_connectionButton->setText(serialConnected ? tr("断开") : tr("连接"));
@@ -260,10 +377,19 @@ void CescToolPage::updateActions()
     auto *manager = m_context->connectionManager();
     const bool busy = m_uploader->isBusy();
     const bool serialReady = manager->canSend()
-        && manager->transportType() == TransportType::SerialPort;
+        && manager->transportType() == TransportType::SerialPort
+        && m_context->cescSession()->isReady()
+        && (m_context->cescSession()->capabilities() & Cesc::FirmwareUpdate);
     m_chooseButton->setEnabled(!busy);
     m_cancelButton->setEnabled(busy);
     m_uploadButton->setEnabled(!busy && m_firmwareValid && serialReady);
     m_connectionButton->setEnabled(!busy
         && manager->state() != ConnectionState::Disconnecting);
+    const bool telemetryReady = !busy && m_context->cescSession()->isReady()
+        && (m_context->cescSession()->capabilities() & Cesc::TelemetryStreaming);
+    m_queryAngleButton->setEnabled(!busy && m_context->cescSession()->isReady()
+        && (m_context->cescSession()->capabilities() & Cesc::SensorService));
+    m_telemetryButton->setEnabled(telemetryReady);
+    m_telemetryButton->setText(m_angleStreamId == 0U
+        ? tr("Start telemetry") : tr("Stop telemetry"));
 }

@@ -68,6 +68,7 @@ bool ConnectionManager::firmwareOperationActive() const noexcept
 {
     return m_firmwareOperationActive;
 }
+bool ConnectionManager::cescNativeActive() const noexcept { return m_cescNativeActive; }
 
 void ConnectionManager::connectTransport(
     const TransportType type, const TransportConfig &config)
@@ -172,6 +173,7 @@ void ConnectionManager::setFirmwareOperationActive(const bool active)
     m_firmwareOperationActive = active;
     emit firmwareOperationActiveChanged(active);
 }
+void ConnectionManager::setCescNativeActive(const bool active) { m_cescNativeActive = active; }
 
 void ConnectionManager::setTcpServerTarget(const QString &clientId)
 {
@@ -209,7 +211,9 @@ void ConnectionManager::createTransport(const TransportType type)
                 const CommunicationTrafficSource source =
                     m_firmwareOperationActive
                         ? CommunicationTrafficSource::CescFirmware
-                        : CommunicationTrafficSource::NormalCommunication;
+                        : (m_cescNativeActive
+                            ? CommunicationTrafficSource::CescNative
+                            : CommunicationTrafficSource::NormalCommunication);
                 m_receiveTotal += static_cast<quint64>(data.size());
                 emit receiveTotalChanged(m_receiveTotal);
                 emit dataReceived(data);

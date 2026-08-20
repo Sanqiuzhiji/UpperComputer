@@ -183,7 +183,8 @@ void ChannelDataHub::retainChannels(
         QWriteLocker locker(&m_lock);
         for (auto record = m_records.begin();
              record != m_records.end();) {
-            if (validChannelIds.contains(record.key())) {
+            if (record->descriptor.protocolId == QStringLiteral("cesc-v1")
+                || validChannelIds.contains(record.key())) {
                 ++record;
             } else {
                 record = m_records.erase(record);

@@ -86,6 +86,8 @@ void ReceiveDataPipeline::handleData(
     }
     const qint64 nowUs = timestampUs();
     emit rawDataReceived(nowUs, data);
+    if (source == CommunicationTrafficSource::CescNative
+        || source == CommunicationTrafficSource::CescFirmware) return;
     if (m_connectionManager->transportType()
         == TransportType::VirtualData) {
         publishVirtualData(nowUs, data);

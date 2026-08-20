@@ -1,85 +1,19 @@
 #pragma once
-
 #include <QByteArray>
 #include <QObject>
-
 #include "models/ConnectionTypes.h"
-
-class ConnectionManager;
-class AppSettings;
-class QTimer;
-
-class CescFirmwareUploader final : public QObject
-{
-    Q_OBJECT
-
+#include "services/cesc/CescProtocolTypes.h"
+class ConnectionManager; class AppSettings; class CescSession; class QTimer;
+class CescFirmwareUploader final : public QObject {
+ Q_OBJECT
 public:
-    enum class State {
-        Idle, Preparing, Uploading, Rebooting, ReadingVersion,
-        Completed, Failed
-    };
-    Q_ENUM(State)
-
-    explicit CescFirmwareUploader(ConnectionManager *connection,
-                                  AppSettings *settings,
-                                  QObject *parent = nullptr);
-    [[nodiscard]] bool isBusy() const noexcept;
-    [[nodiscard]] State state() const noexcept;
-    [[nodiscard]] int progress() const noexcept;
-    [[nodiscard]] QString statusText() const;
-    [[nodiscard]] QString firmwareVersion() const;
-
-public slots:
-    void start(const QByteArray &firmware);
-    void cancel();
-    void requestFirmwareVersion();
-
-signals:
-    void progressChanged(int percent, const QString &status);
-    void finished(bool success, const QString &message);
-    void stateChanged(CescFirmwareUploader::State state, int percent,
-                      const QString &status);
-    void firmwareVersionChanged(const QString &version);
-
+ enum class State { Idle,Preparing,Uploading,Verifying,Rebooting,ReadingVersion,Completed,Failed }; Q_ENUM(State)
+ CescFirmwareUploader(ConnectionManager*,AppSettings*,CescSession*,QObject *parent=nullptr);
+ bool isBusy()const noexcept; State state()const noexcept; int progress()const noexcept; QString statusText()const; QString firmwareVersion()const;
+public slots: void start(const QByteArray&); void cancel(); void requestFirmwareVersion();
+signals: void progressChanged(int,const QString&); void finished(bool,const QString&); void stateChanged(CescFirmwareUploader::State,int,const QString&); void firmwareVersionChanged(const QString&);
 private:
-    enum class Stage {
-        Idle, Erasing, Writing, WaitingForPort, Connecting, ReadingVersion
-    };
-
-    void sendErase();
-    void sendCurrentChunk();
-    void handlePacket(const QByteArray &packet);
-    void processReceived(const QByteArray &data);
-    void handleTimeout();
-    void beginPostUploadRecovery();
-    void tryReconnect();
-    void sendFirmwareVersionRequest(bool postUpload);
-    void handleFirmwareVersion(const QByteArray &packet);
-    [[nodiscard]] QString findReappearedPort() const;
-    void complete(bool success, const QString &message);
-    void updateState(State state, int percent, const QString &status);
-    [[nodiscard]] QByteArray frame(const QByteArray &payload) const;
-    [[nodiscard]] static quint16 crc16(const QByteArray &data);
-    static void appendUint32(QByteArray &data, quint32 value);
-
-    ConnectionManager *m_connection{};
-    AppSettings *m_settings{};
-    QTimer *m_timeout{};
-    QTimer *m_reconnectTimer{};
-    Stage m_stage{Stage::Idle};
-    QByteArray m_image;
-    QByteArray m_rxBuffer;
-    qsizetype m_offset{};
-    qsizetype m_chunkLength{};
-    int m_attempt{};
-    State m_publicState{State::Idle};
-    int m_progress{};
-    QString m_statusText;
-    QString m_firmwareVersion;
-    SerialConfig m_reconnectConfig;
-    QString m_usbSerialNumber;
-    quint16 m_usbVendorId{};
-    quint16 m_usbProductId{};
-    int m_reconnectAttempts{};
-    bool m_postUploadVersionRequest{};
+ enum class Stage { Idle,Stop,Begin,Write,Finish,Activate,WaitPort,Connecting,Info };
+ void response(quint8,quint8,Cesc::Status,const QByteArray&); void begin(); void write(); void finishImage(); void activate(); void recover(); void reconnect(); QString findPort()const; void done(bool,const QString&); void update(State,int,const QString&); static quint32 crc32(const QByteArray&);
+ ConnectionManager*m_connection{}; AppSettings*m_settings{}; CescSession*m_session{}; QTimer*m_reconnect{}; Stage m_stage{Stage::Idle}; QByteArray m_image; quint32 m_crc{},m_updateId{},m_offset{},m_oldSession{}; quint16 m_chunk{512}; State m_state{State::Idle}; int m_progress{}; QString m_text,m_version; SerialConfig m_config; QString m_serial; quint16 m_vid{},m_pid{}; int m_attempt{};
 };

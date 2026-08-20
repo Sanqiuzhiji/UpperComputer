@@ -35,6 +35,22 @@ set(TELEMETRY_SOURCES
     src/services/ReceiveDataPipeline.cpp
 )
 
+set(CESC_SOURCES
+    src/services/cesc/CescProtocolTypes.h
+    src/services/cesc/CescPacketCodec.h
+    src/services/cesc/CescPacketCodec.cpp
+    src/services/cesc/CescTransactionManager.h
+    src/services/cesc/CescTransactionManager.cpp
+    src/services/cesc/CescSession.h
+    src/services/cesc/CescSession.cpp
+    src/services/cesc/CescSystemClient.h
+    src/services/cesc/CescSystemClient.cpp
+    src/services/cesc/CescSensorClient.h
+    src/services/cesc/CescSensorClient.cpp
+    src/services/cesc/CescTelemetryClient.h
+    src/services/cesc/CescTelemetryClient.cpp
+)
+
 set(PLOT_SOURCES
     src/pages/plot/PlotTypes.h
     src/pages/plot/PlotTheme.h
@@ -78,6 +94,7 @@ qt_add_executable(UpperComputer WIN32
     src/services/ProtocolRepository.h
     src/services/ProtocolRepository.cpp
     ${TELEMETRY_SOURCES}
+    ${CESC_SOURCES}
     src/services/transports/AbstractTransport.h
     src/services/transports/AbstractTransport.cpp
     src/services/transports/SerialTransport.h
@@ -172,6 +189,46 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+    qt_add_executable(CescLivePlotTest
+        tests/CescLivePlotTest.cpp
+        src/models/AppTypes.h
+        src/models/ConnectionTypes.h
+        src/models/ProtocolDefinition.h
+        src/services/ChannelDataHub.h
+        src/services/ChannelDataHub.cpp
+        src/services/ConnectionManager.h
+        src/services/ConnectionManager.cpp
+        ${CESC_SOURCES}
+        src/services/transports/AbstractTransport.h
+        src/services/transports/AbstractTransport.cpp
+        src/services/transports/SerialTransport.h
+        src/services/transports/SerialTransport.cpp
+        src/services/transports/NetworkTransports.h
+        src/services/transports/NetworkTransports.cpp
+        src/services/transports/VirtualTransport.h
+        src/services/transports/VirtualTransport.cpp)
+    target_include_directories(CescLivePlotTest PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_link_libraries(CescLivePlotTest PRIVATE
+        Qt6::Core Qt6::Network Qt6::SerialPort)
+    if(MSVC)
+        target_compile_options(CescLivePlotTest PRIVATE
+            /W4 /utf-8 /permissive-)
+    endif()
+
+    qt_add_executable(CescProtocolTest
+        tests/CescProtocolTest.cpp
+        src/services/cesc/CescProtocolTypes.h
+        src/services/cesc/CescPacketCodec.h
+        src/services/cesc/CescPacketCodec.cpp
+        src/services/cesc/CescTransactionManager.h
+        src/services/cesc/CescTransactionManager.cpp)
+    target_include_directories(CescProtocolTest PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_link_libraries(CescProtocolTest PRIVATE Qt6::Core)
+    if(MSVC)
+        target_compile_options(CescProtocolTest PRIVATE /W4 /utf-8 /permissive-)
+    endif()
+    add_test(NAME CescProtocolTest COMMAND CescProtocolTest)
     qt_add_executable(BuiltInStreamParserTest
         tests/BuiltInStreamParserTest.cpp
         src/models/ConnectionTypes.h
@@ -273,6 +330,7 @@ if(BUILD_TESTING)
         src/app/AppContext.cpp
         src/services/CescFirmwareUploader.h
         src/services/CescFirmwareUploader.cpp
+        ${CESC_SOURCES}
         src/services/ConnectionManager.h
         src/services/ConnectionManager.cpp
         src/services/CommunicationCodec.h
@@ -351,6 +409,7 @@ if(BUILD_TESTING)
         src/app/AppContext.cpp
         src/services/CescFirmwareUploader.h
         src/services/CescFirmwareUploader.cpp
+        ${CESC_SOURCES}
         src/services/ConnectionManager.h
         src/services/ConnectionManager.cpp
         src/services/CommunicationCodec.h
@@ -444,6 +503,7 @@ if(BUILD_TESTING)
         src/app/AppContext.cpp
         src/services/CescFirmwareUploader.h
         src/services/CescFirmwareUploader.cpp
+        ${CESC_SOURCES}
         src/services/ConnectionManager.h
         src/services/ConnectionManager.cpp
         src/services/CommunicationCodec.h
