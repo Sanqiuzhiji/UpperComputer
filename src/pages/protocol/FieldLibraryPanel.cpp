@@ -110,6 +110,8 @@ FieldLibraryPanel::FieldLibraryPanel(QWidget *parent)
         FieldRole::FrameId,
         FieldRole::Length,
         FieldRole::Data,
+        FieldRole::Constant,
+        FieldRole::Sequence,
         FieldRole::Checksum,
         FieldRole::Tail,
         FieldRole::Skip

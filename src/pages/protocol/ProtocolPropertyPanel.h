@@ -81,6 +81,16 @@ private:
     QLabel *m_fixedHexError{};
     QWidget *m_checksumRow{};
     QComboBox *m_checksum{};
+    QWidget *m_checksumStartRow{};
+    QComboBox *m_checksumStart{};
+    QWidget *m_checksumEndRow{};
+    QComboBox *m_checksumEnd{};
+    QWidget *m_lengthStartRow{};
+    QComboBox *m_lengthStart{};
+    QWidget *m_lengthEndRow{};
+    QComboBox *m_lengthEnd{};
+    QWidget *m_sequenceGroupRow{};
+    QLineEdit *m_sequenceGroup{};
     QLabel *m_fieldErrors{};
 
     bool m_updating{};

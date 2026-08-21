@@ -37,9 +37,11 @@ ProtocolFieldType communicationType(const DataType type)
     switch (role) {
     case FieldRole::Header: return ::ProtocolFieldRole::FrameHeader;
     case FieldRole::FrameId: return ::ProtocolFieldRole::MessageId;
+    case FieldRole::Sequence: return ::ProtocolFieldRole::Sequence;
     case FieldRole::Length: return ::ProtocolFieldRole::Length;
     case FieldRole::Checksum: return ::ProtocolFieldRole::Checksum;
     case FieldRole::Tail: return ::ProtocolFieldRole::Constant;
+    case FieldRole::Constant: return ::ProtocolFieldRole::Constant;
     case FieldRole::Skip: return ::ProtocolFieldRole::Constant;
     case FieldRole::Data: return ::ProtocolFieldRole::Value;
     }
@@ -56,6 +58,8 @@ ProtocolFieldType communicationType(const DataType type)
         return ::ProtocolChecksumAlgorithm::Xor8;
     case ChecksumAlgorithm::Crc8:
         return ::ProtocolChecksumAlgorithm::Crc8;
+    case ChecksumAlgorithm::Crc16CcittZero:
+        return ::ProtocolChecksumAlgorithm::Crc16CcittZero;
     }
     return ::ProtocolChecksumAlgorithm::Sum8;
 }
@@ -210,8 +214,19 @@ QList<ProtocolDefinition> ProtocolRepository::communicationDefinitions() const
                 target.offset = field.offset;
                 target.checksumAlgorithm =
                     communicationChecksum(field.checksumAlgorithm);
+                target.checksumStartFieldId =
+                    normalizedId(field.checksumStartFieldId);
+                target.checksumEndFieldId =
+                    normalizedId(field.checksumEndFieldId);
+                target.lengthStartFieldId =
+                    normalizedId(field.lengthStartFieldId);
+                target.lengthEndFieldId =
+                    normalizedId(field.lengthEndFieldId);
+                target.sequenceGroup = field.sequenceGroup.trimmed().isEmpty()
+                    ? QStringLiteral("default") : field.sequenceGroup.trimmed();
                 if (field.role == FieldRole::Header
-                    || field.role == FieldRole::Tail) {
+                    || field.role == FieldRole::Tail
+                    || field.role == FieldRole::Constant) {
                     target.defaultValue = field.fixedBytes;
                     target.fixedValue = field.fixedBytes;
                 } else if (field.role == FieldRole::Skip) {

@@ -79,7 +79,8 @@ FieldRole roleFromMime(const QByteArray &data)
     const QString key = QString::fromUtf8(data);
     constexpr FieldRole roles[]{
         FieldRole::Header, FieldRole::FrameId, FieldRole::Length,
-        FieldRole::Data, FieldRole::Checksum, FieldRole::Tail, FieldRole::Skip
+        FieldRole::Data, FieldRole::Constant, FieldRole::Sequence,
+        FieldRole::Checksum, FieldRole::Tail, FieldRole::Skip
     };
     for (const FieldRole role : roles) {
         if (roleKey(role) == key) return role;

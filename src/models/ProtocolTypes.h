@@ -15,6 +15,8 @@ enum class FieldRole {
     FrameId,
     Length,
     Data,
+    Constant,
+    Sequence,
     Checksum,
     Tail,
     Skip
@@ -42,7 +44,8 @@ enum class ByteOrder {
 enum class ChecksumAlgorithm {
     Sum8,
     Xor8,
-    Crc8
+    Crc8,
+    Crc16CcittZero
 };
 
 enum class FrameDirection {
@@ -62,6 +65,11 @@ struct Field {
     double offset{0.0};
     QByteArray fixedBytes;
     ChecksumAlgorithm checksumAlgorithm{ChecksumAlgorithm::Sum8};
+    QUuid checksumStartFieldId;
+    QUuid checksumEndFieldId;
+    QUuid lengthStartFieldId;
+    QUuid lengthEndFieldId;
+    QString sequenceGroup{QStringLiteral("default")};
 
     bool operator==(const Field &) const = default;
 };

@@ -37,6 +37,20 @@ quint8 ChecksumUtils::crc8Maxim(const QByteArray &data)
     return crc;
 }
 
+quint16 ChecksumUtils::crc16CcittZero(const QByteArray &data)
+{
+    quint16 crc = 0x0000;
+    for (const char byte : data) {
+        crc ^= static_cast<quint16>(static_cast<quint8>(byte)) << 8U;
+        for (int bit = 0; bit < 8; ++bit) {
+            crc = (crc & 0x8000U)
+                ? static_cast<quint16>((crc << 1U) ^ 0x1021U)
+                : static_cast<quint16>(crc << 1U);
+        }
+    }
+    return crc;
+}
+
 QByteArray ChecksumUtils::append(
     const QByteArray &payload, const ChecksumMode mode)
 {

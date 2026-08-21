@@ -17,7 +17,9 @@
 #include "pages/protocol/ProtocolCanvas.h"
 #include "pages/protocol/ProtocolFrameWidget.h"
 #include "services/ProtocolRepository.h"
+#include "services/CustomBinaryCodec.h"
 #include "theme/ThemeManager.h"
+#include "utils/ChecksumUtils.h"
 
 namespace {
 
@@ -73,6 +75,112 @@ void testModelAndJson()
     verify(
         hasValidationErrors(validate(roundTrip)),
         "fixed Hex length mismatch is rejected");
+}
+
+void testCrc16AndCoverage()
+{
+    verify(ChecksumUtils::crc16CcittZero(QByteArrayLiteral("123456789"))
+               == 0x31C3U,
+           "CRC-16/CCITT zero-init matches the standard check value");
+
+    ProtocolDefinition protocol;
+    protocol.id = QStringLiteral("crc-range");
+    MessageDefinition message;
+    message.id = QStringLiteral("frame");
+    for (int index = 1; index <= 3; ++index) {
+        FieldDefinition field;
+        field.id = QStringLiteral("component%1").arg(index);
+        field.displayName = field.id;
+        field.type = ProtocolFieldType::ByteArray;
+        field.bitWidth = 8;
+        field.editable = false;
+        field.role = ProtocolFieldRole::Constant;
+        field.defaultValue = QByteArray(1, static_cast<char>(index));
+        field.fixedValue = field.defaultValue;
+        message.fields.append(field);
+    }
+    FieldDefinition checksum;
+    checksum.id = QStringLiteral("checksum");
+    checksum.displayName = checksum.id;
+    checksum.type = ProtocolFieldType::UInt;
+    checksum.bitWidth = 16;
+    checksum.editable = false;
+    checksum.role = ProtocolFieldRole::Checksum;
+    checksum.littleEndian = false;
+    checksum.checksumAlgorithm = ProtocolChecksumAlgorithm::Crc16CcittZero;
+    checksum.checksumStartFieldId = QStringLiteral("component2");
+    checksum.checksumEndFieldId = QStringLiteral("component3");
+    message.fields.append(checksum);
+    protocol.sendMessages.append(message);
+
+    QByteArray encoded;
+    QString error;
+    CustomBinaryCodec codec(protocol);
+    verify(codec.encode(protocol, message, {}, &encoded, &error),
+           "CRC range frame encodes");
+    const quint16 expected = ChecksumUtils::crc16CcittZero(
+        QByteArray::fromHex("0203"));
+    QByteArray expectedBytes;
+    expectedBytes.append(static_cast<char>(expected >> 8U));
+    expectedBytes.append(static_cast<char>(expected));
+    verify(encoded == QByteArray::fromHex("010203") + expectedBytes,
+           "CRC covers only the selected continuous component range");
+}
+
+void testAutomaticSequenceAndCoveredLength()
+{
+    ProtocolDefinition protocol;
+    protocol.id = QStringLiteral("automatic-fields");
+    MessageDefinition message;
+    message.id = QStringLiteral("command");
+
+    FieldDefinition sequence;
+    sequence.id = QStringLiteral("sequence");
+    sequence.type = ProtocolFieldType::UInt;
+    sequence.bitWidth = 16;
+    sequence.littleEndian = true;
+    sequence.editable = false;
+    sequence.role = ProtocolFieldRole::Sequence;
+
+    FieldDefinition length = sequence;
+    length.id = QStringLiteral("length");
+    length.role = ProtocolFieldRole::Length;
+    length.lengthStartFieldId = QStringLiteral("data1");
+    length.lengthEndFieldId = QStringLiteral("data2");
+
+    FieldDefinition data1;
+    data1.id = QStringLiteral("data1");
+    data1.type = ProtocolFieldType::ByteArray;
+    data1.bitWidth = 8;
+    data1.editable = false;
+    data1.role = ProtocolFieldRole::Constant;
+    data1.fixedValue = QByteArray::fromHex("AA");
+    FieldDefinition data2 = data1;
+    data2.id = QStringLiteral("data2");
+    data2.fixedValue = QByteArray::fromHex("BB");
+    message.fields = {sequence, length, data1, data2};
+    protocol.sendMessages = {message};
+
+    CustomBinaryCodec codec(protocol);
+    QByteArray first;
+    QByteArray second;
+    QString error;
+    verify(codec.encode(protocol, message, {}, &first, &error),
+           "automatic fields first frame encodes");
+    verify(codec.encode(protocol, message, {}, &second, &error),
+           "automatic fields second frame encodes");
+    verify(first == QByteArray::fromHex("01000200AABB"),
+           "sequence starts at one and covered length is two");
+    verify(second == QByteArray::fromHex("02000200AABB"),
+           "sequence increments for the next command");
+    MessageDefinition otherMessage = message;
+    otherMessage.id = QStringLiteral("other-command");
+    otherMessage.fields[0].id = QStringLiteral("other-sequence");
+    QByteArray third;
+    verify(codec.encode(protocol, otherMessage, {}, &third, &error),
+           "shared sequence group encodes another command");
+    verify(third == QByteArray::fromHex("03000200AABB"),
+           "commands in one protocol share the default sequence counter");
 }
 
 void testRepository()
@@ -422,6 +530,8 @@ int main(int argc, char **argv)
         settingsDirectory.path());
 
     testModelAndJson();
+    testCrc16AndCoverage();
+    testAutomaticSequenceAndCoveredLength();
     testRepository();
     testPage();
     return failures == 0 ? 0 : 1;

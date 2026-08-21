@@ -40,6 +40,8 @@ QString uniqueDefaultName(const FieldRole role)
     case FieldRole::FrameId: return QStringLiteral("frameId");
     case FieldRole::Length: return QStringLiteral("length");
     case FieldRole::Data: return QStringLiteral("data");
+    case FieldRole::Constant: return QStringLiteral("constant");
+    case FieldRole::Sequence: return QStringLiteral("sequence");
     case FieldRole::Checksum: return QStringLiteral("checksum");
     case FieldRole::Tail: return QStringLiteral("tail");
     case FieldRole::Skip: return QStringLiteral("skip");
@@ -75,6 +77,25 @@ QJsonObject fieldToJson(const Field &field)
     object.insert(
         QStringLiteral("checksumAlgorithm"),
         checksumKey(field.checksumAlgorithm));
+    if (!field.checksumStartFieldId.isNull()) {
+        object.insert(QStringLiteral("checksumStartFieldId"),
+                      uuidText(field.checksumStartFieldId));
+    }
+    if (!field.checksumEndFieldId.isNull()) {
+        object.insert(QStringLiteral("checksumEndFieldId"),
+                      uuidText(field.checksumEndFieldId));
+    }
+    if (!field.lengthStartFieldId.isNull()) {
+        object.insert(QStringLiteral("lengthStartFieldId"),
+                      uuidText(field.lengthStartFieldId));
+    }
+    if (!field.lengthEndFieldId.isNull()) {
+        object.insert(QStringLiteral("lengthEndFieldId"),
+                      uuidText(field.lengthEndFieldId));
+    }
+    if (field.role == FieldRole::Sequence) {
+        object.insert(QStringLiteral("sequenceGroup"), field.sequenceGroup);
+    }
     return object;
 }
 
@@ -91,6 +112,8 @@ Field fieldFromJson(const QJsonObject &object)
             {QStringLiteral("frameId"), FieldRole::FrameId},
             {QStringLiteral("length"), FieldRole::Length},
             {QStringLiteral("data"), FieldRole::Data},
+            {QStringLiteral("constant"), FieldRole::Constant},
+            {QStringLiteral("sequence"), FieldRole::Sequence},
             {QStringLiteral("checksum"), FieldRole::Checksum},
             {QStringLiteral("tail"), FieldRole::Tail},
             {QStringLiteral("skip"), FieldRole::Skip}
@@ -131,9 +154,17 @@ Field fieldFromJson(const QJsonObject &object)
         {
             {QStringLiteral("sum8"), ChecksumAlgorithm::Sum8},
             {QStringLiteral("xor8"), ChecksumAlgorithm::Xor8},
-            {QStringLiteral("crc8"), ChecksumAlgorithm::Crc8}
+            {QStringLiteral("crc8"), ChecksumAlgorithm::Crc8},
+            {QStringLiteral("crc16CcittZero"),
+             ChecksumAlgorithm::Crc16CcittZero}
         },
         ChecksumAlgorithm::Sum8);
+    field.checksumStartFieldId = readUuid(object, "checksumStartFieldId");
+    field.checksumEndFieldId = readUuid(object, "checksumEndFieldId");
+    field.lengthStartFieldId = readUuid(object, "lengthStartFieldId");
+    field.lengthEndFieldId = readUuid(object, "lengthEndFieldId");
+    field.sequenceGroup = object.value(QStringLiteral("sequenceGroup"))
+                              .toString(QStringLiteral("default"));
     return field;
 }
 
@@ -158,6 +189,7 @@ Field makeField(const FieldRole role)
         break;
     case FieldRole::FrameId:
     case FieldRole::Length:
+    case FieldRole::Sequence:
     case FieldRole::Checksum:
     case FieldRole::Skip:
         field.byteCount = 1;
@@ -166,6 +198,11 @@ Field makeField(const FieldRole role)
     case FieldRole::Data:
         field.byteCount = 1;
         field.dataType = DataType::UInt8;
+        break;
+    case FieldRole::Constant:
+        field.byteCount = 1;
+        field.fixedBytes = QByteArray(1, '\0');
+        field.dataType = DataType::Bytes;
         break;
     }
     return field;
@@ -199,8 +236,25 @@ Frame duplicatedFrame(const Frame &source)
 {
     Frame result = source;
     result.id = QUuid::createUuid();
+    QHash<QUuid, QUuid> duplicatedIds;
     for (Field &field : result.fields) {
+        const QUuid oldId = field.id;
         field.id = QUuid::createUuid();
+        duplicatedIds.insert(oldId, field.id);
+    }
+    for (Field &field : result.fields) {
+        if (duplicatedIds.contains(field.checksumStartFieldId)) {
+            field.checksumStartFieldId = duplicatedIds.value(field.checksumStartFieldId);
+        }
+        if (duplicatedIds.contains(field.checksumEndFieldId)) {
+            field.checksumEndFieldId = duplicatedIds.value(field.checksumEndFieldId);
+        }
+        if (duplicatedIds.contains(field.lengthStartFieldId)) {
+            field.lengthStartFieldId = duplicatedIds.value(field.lengthStartFieldId);
+        }
+        if (duplicatedIds.contains(field.lengthEndFieldId)) {
+            field.lengthEndFieldId = duplicatedIds.value(field.lengthEndFieldId);
+        }
     }
     return result;
 }
@@ -260,6 +314,8 @@ QString roleKey(const FieldRole role)
     case FieldRole::FrameId: return QStringLiteral("frameId");
     case FieldRole::Length: return QStringLiteral("length");
     case FieldRole::Data: return QStringLiteral("data");
+    case FieldRole::Constant: return QStringLiteral("constant");
+    case FieldRole::Sequence: return QStringLiteral("sequence");
     case FieldRole::Checksum: return QStringLiteral("checksum");
     case FieldRole::Tail: return QStringLiteral("tail");
     case FieldRole::Skip: return QStringLiteral("skip");
@@ -274,6 +330,8 @@ QString roleDisplayName(const FieldRole role)
     case FieldRole::FrameId: return QStringLiteral("帧 ID FrameId");
     case FieldRole::Length: return QStringLiteral("帧长度 Length");
     case FieldRole::Data: return QStringLiteral("数据 Data");
+    case FieldRole::Constant: return QStringLiteral("常量 Constant");
+    case FieldRole::Sequence: return QStringLiteral("序列号 Sequence");
     case FieldRole::Checksum: return QStringLiteral("校验 Checksum");
     case FieldRole::Tail: return QStringLiteral("帧尾 Tail");
     case FieldRole::Skip: return QStringLiteral("跳过 Skip");
@@ -316,6 +374,8 @@ QString checksumKey(const ChecksumAlgorithm algorithm)
     case ChecksumAlgorithm::Sum8: return QStringLiteral("sum8");
     case ChecksumAlgorithm::Xor8: return QStringLiteral("xor8");
     case ChecksumAlgorithm::Crc8: return QStringLiteral("crc8");
+    case ChecksumAlgorithm::Crc16CcittZero:
+        return QStringLiteral("crc16CcittZero");
     }
     return QStringLiteral("sum8");
 }
@@ -327,6 +387,8 @@ QString fieldRoleColor(const FieldRole role)
     case FieldRole::FrameId: return QStringLiteral("#22B8CF");
     case FieldRole::Length: return QStringLiteral("#8B5CF6");
     case FieldRole::Data: return QStringLiteral("#22C55E");
+    case FieldRole::Constant: return QStringLiteral("#14B8A6");
+    case FieldRole::Sequence: return QStringLiteral("#06B6D4");
     case FieldRole::Checksum: return QStringLiteral("#F59E0B");
     case FieldRole::Tail: return QStringLiteral("#64748B");
     case FieldRole::Skip: return QStringLiteral("#8B929E");
@@ -455,7 +517,8 @@ QVector<ValidationIssue> validate(const Document &document)
         }
 
         QSet<QString> fieldNames;
-        for (const Field &field : frame.fields) {
+        for (int fieldIndex = 0; fieldIndex < frame.fields.size(); ++fieldIndex) {
+            const Field &field = frame.fields.at(fieldIndex);
             const QString fieldName = field.name.trimmed().toCaseFolded();
             if (fieldName.isEmpty()) {
                 issues.append({
@@ -479,7 +542,8 @@ QVector<ValidationIssue> validate(const Document &document)
                     frame.id, field.id});
             }
             if (field.role == FieldRole::Header
-                || field.role == FieldRole::Tail) {
+                || field.role == FieldRole::Tail
+                || field.role == FieldRole::Constant) {
                 if (field.fixedBytes.size() != field.byteCount) {
                     issues.append({
                         ValidationSeverity::Error,
@@ -488,9 +552,34 @@ QVector<ValidationIssue> validate(const Document &document)
                         frame.id, field.id});
                 }
             }
+            if (field.role == FieldRole::Checksum) {
+                if (field.checksumAlgorithm == ChecksumAlgorithm::Crc16CcittZero
+                    && field.byteCount != 2) {
+                    issues.append({ValidationSeverity::Error,
+                        QStringLiteral("CRC-16/CCITT 校验字段必须为 2 字节"),
+                        frame.id, field.id});
+                }
+                if (!field.checksumStartFieldId.isNull()
+                    || !field.checksumEndFieldId.isNull()) {
+                    const auto indexOf = [&frame](const QUuid &id) {
+                        for (int i = 0; i < frame.fields.size(); ++i) {
+                            if (frame.fields.at(i).id == id) return i;
+                        }
+                        return -1;
+                    };
+                    const int start = indexOf(field.checksumStartFieldId);
+                    const int end = indexOf(field.checksumEndFieldId);
+                    if (start < 0 || end < 0 || start > end || end >= fieldIndex) {
+                        issues.append({ValidationSeverity::Error,
+                            QStringLiteral("校验区间必须是当前校验字段之前的连续字段"),
+                            frame.id, field.id});
+                    }
+                }
+            }
             const bool typedRole = field.role == FieldRole::Data
                 || field.role == FieldRole::FrameId
-                || field.role == FieldRole::Length;
+                || field.role == FieldRole::Length
+                || field.role == FieldRole::Sequence;
             const int natural = naturalByteCount(field.dataType);
             if (typedRole && natural > 0 && natural != field.byteCount) {
                 issues.append({
@@ -499,6 +588,29 @@ QVector<ValidationIssue> validate(const Document &document)
                         .arg(dataTypeDisplayName(field.dataType))
                         .arg(natural)
                         .arg(field.byteCount),
+                    frame.id, field.id});
+            }
+            if (field.role == FieldRole::Length
+                && (!field.lengthStartFieldId.isNull()
+                    || !field.lengthEndFieldId.isNull())) {
+                const auto indexOf = [&frame](const QUuid &id) {
+                    for (int i = 0; i < frame.fields.size(); ++i) {
+                        if (frame.fields.at(i).id == id) return i;
+                    }
+                    return -1;
+                };
+                const int start = indexOf(field.lengthStartFieldId);
+                const int end = indexOf(field.lengthEndFieldId);
+                if (start < 0 || end < 0 || start > end) {
+                    issues.append({ValidationSeverity::Error,
+                        QStringLiteral("长度区间必须是同一帧中的连续字段"),
+                        frame.id, field.id});
+                }
+            }
+            if (field.role == FieldRole::Sequence
+                && field.sequenceGroup.trimmed().isEmpty()) {
+                issues.append({ValidationSeverity::Error,
+                    QStringLiteral("自动序列号的计数器组不能为空"),
                     frame.id, field.id});
             }
         }

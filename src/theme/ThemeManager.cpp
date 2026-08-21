@@ -247,6 +247,8 @@ QString ThemeManager::styleSheet() const
         QFrame[roleStripe="true"][fieldRole="frameId"] { background: #22B8CF; }
         QFrame[roleStripe="true"][fieldRole="length"] { background: #8B5CF6; }
         QFrame[roleStripe="true"][fieldRole="data"] { background: #22C55E; }
+        QFrame[roleStripe="true"][fieldRole="constant"] { background: #14B8A6; }
+        QFrame[roleStripe="true"][fieldRole="sequence"] { background: #06B6D4; }
         QFrame[roleStripe="true"][fieldRole="checksum"] { background: #F59E0B; }
         QFrame[roleStripe="true"][fieldRole="tail"] { background: #64748B; }
         QFrame[roleStripe="true"][fieldRole="skip"] { background: #8B929E; }

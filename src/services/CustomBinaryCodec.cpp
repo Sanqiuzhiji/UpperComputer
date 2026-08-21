@@ -24,6 +24,28 @@ int messageByteCount(const MessageDefinition &message)
     return result;
 }
 
+int coveredFieldByteCount(
+    const MessageDefinition &message,
+    const QString &startFieldId,
+    const QString &endFieldId)
+{
+    if (startFieldId.isEmpty() && endFieldId.isEmpty()) {
+        return messageByteCount(message);
+    }
+    bool covering = false;
+    bool complete = false;
+    int result = 0;
+    for (const FieldDefinition &field : message.fields) {
+        if (field.id == startFieldId) covering = true;
+        if (covering) result += fieldByteCount(field);
+        if (field.id == endFieldId) {
+            complete = covering;
+            break;
+        }
+    }
+    return complete ? result : 0;
+}
+
 QByteArray unsignedBytes(
     quint64 value, const int size, const bool littleEndian)
 {
@@ -53,7 +75,7 @@ QByteArray checksumBytes(
     const QByteArray &covered,
     const FieldDefinition &field)
 {
-    quint8 value = 0;
+    quint64 value = 0;
     switch (field.checksumAlgorithm) {
     case ProtocolChecksumAlgorithm::Sum8:
         for (const char byte : covered) {
@@ -67,9 +89,48 @@ QByteArray checksumBytes(
     case ProtocolChecksumAlgorithm::Crc8:
         value = ChecksumUtils::crc8(covered);
         break;
+    case ProtocolChecksumAlgorithm::Crc16CcittZero:
+        value = ChecksumUtils::crc16CcittZero(covered);
+        break;
     }
     return unsignedBytes(
         value, fieldByteCount(field), field.littleEndian);
+}
+
+QByteArray checksumCoverage(
+    const QByteArray &frame,
+    const MessageDefinition &message,
+    const int checksumIndex)
+{
+    const FieldDefinition &checksum = message.fields.at(checksumIndex);
+    int checksumOffset = 0;
+    for (int i = 0; i < checksumIndex; ++i) {
+        checksumOffset += fieldByteCount(message.fields.at(i));
+    }
+    if (checksum.checksumStartFieldId.isEmpty()
+        && checksum.checksumEndFieldId.isEmpty()) {
+        return frame.left(checksumOffset);
+    }
+
+    int startOffset = 0;
+    int endOffset = 0;
+    bool foundStart = false;
+    bool foundEnd = false;
+    int offset = 0;
+    for (int i = 0; i < checksumIndex; ++i) {
+        const FieldDefinition &candidate = message.fields.at(i);
+        if (candidate.id == checksum.checksumStartFieldId) {
+            startOffset = offset;
+            foundStart = true;
+        }
+        offset += fieldByteCount(candidate);
+        if (candidate.id == checksum.checksumEndFieldId) {
+            endOffset = offset;
+            foundEnd = true;
+        }
+    }
+    if (!foundStart || !foundEnd || endOffset < startOffset) return {};
+    return frame.mid(startOffset, endOffset - startOffset);
 }
 
 QString fieldName(const FieldDefinition &field, const int index)
@@ -88,7 +149,11 @@ QVariant automaticValue(
     const int totalSize)
 {
     if (field.role == ProtocolFieldRole::Length) {
-        return totalSize;
+        return field.lengthStartFieldId.isEmpty()
+                && field.lengthEndFieldId.isEmpty()
+            ? totalSize
+            : coveredFieldByteCount(message, field.lengthStartFieldId,
+                                    field.lengthEndFieldId);
     }
     if (field.role == ProtocolFieldRole::MessageId) {
         if (field.fixedValue.isValid()) return field.fixedValue;
@@ -323,7 +388,7 @@ bool decodeMessage(
 
         if (field.role == ProtocolFieldRole::Checksum) {
             const QByteArray expected =
-                checksumBytes(frame.left(offset), field);
+                checksumBytes(checksumCoverage(frame, message, index), field);
             if (bytes != expected) {
                 *error = QStringLiteral("协议“%1”校验失败")
                              .arg(parsed->displayName);
@@ -332,12 +397,17 @@ bool decodeMessage(
         } else if (field.role == ProtocolFieldRole::Length) {
             const quint64 stated =
                 bytesToUnsigned(bytes, field.littleEndian);
-            if (stated != static_cast<quint64>(totalSize)) {
+            const int expectedLength = field.lengthStartFieldId.isEmpty()
+                    && field.lengthEndFieldId.isEmpty()
+                ? totalSize
+                : coveredFieldByteCount(message, field.lengthStartFieldId,
+                                        field.lengthEndFieldId);
+            if (stated != static_cast<quint64>(expectedLength)) {
                 *error = QStringLiteral(
                     "协议“%1”长度字段为 %2，实际应为 %3")
                              .arg(parsed->displayName)
                              .arg(stated)
-                             .arg(totalSize);
+                             .arg(expectedLength);
                 return false;
             }
         } else {
@@ -381,7 +451,24 @@ bool CustomBinaryCodec::encode(
     for (int index = 0; index < message.fields.size(); ++index) {
         const FieldDefinition &field = message.fields.at(index);
         if (field.role == ProtocolFieldRole::Checksum) {
-            payload->append(checksumBytes(*payload, field));
+            payload->append(checksumBytes(
+                checksumCoverage(*payload, message, index), field));
+            continue;
+        }
+        if (field.role == ProtocolFieldRole::Sequence) {
+            const QString sequenceKey = protocol.id + QLatin1Char('/')
+                + field.sequenceGroup;
+            quint64 &next = m_nextSequences[sequenceKey];
+            if (next == 0) next = 1;
+            QByteArray bytes;
+            if (!encodeValue(field, next, &bytes, errorMessage)) return false;
+            payload->append(bytes);
+            const int bits = qMin(64, fieldByteCount(field) * 8);
+            const quint64 mask = bits == 64
+                ? (std::numeric_limits<quint64>::max)()
+                : (quint64{1} << bits) - 1U;
+            next = (next + 1U) & mask;
+            if (next == 0) next = 1;
             continue;
         }
         const QString id = field.id.trimmed().isEmpty()

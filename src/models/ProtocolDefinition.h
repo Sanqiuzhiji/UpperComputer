@@ -23,13 +23,15 @@ enum class ProtocolFieldRole {
     FrameHeader,
     Length,
     MessageId,
+    Sequence,
     Checksum
 };
 
 enum class ProtocolChecksumAlgorithm {
     Sum8,
     Xor8,
-    Crc8
+    Crc8,
+    Crc16CcittZero
 };
 
 struct EnumOption {
@@ -56,6 +58,11 @@ struct FieldDefinition {
     double offset{0.0};
     ProtocolChecksumAlgorithm checksumAlgorithm{
         ProtocolChecksumAlgorithm::Sum8};
+    QString checksumStartFieldId;
+    QString checksumEndFieldId;
+    QString lengthStartFieldId;
+    QString lengthEndFieldId;
+    QString sequenceGroup{QStringLiteral("default")};
 };
 
 struct MessageDefinition {

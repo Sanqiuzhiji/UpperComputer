@@ -162,6 +162,37 @@ void ProtocolPropertyPanel::showField(
     m_checksum->setCurrentIndex(
         m_checksum->findData(QVariant::fromValue(
             field.checksumAlgorithm)));
+    m_checksumStart->clear();
+    m_checksumEnd->clear();
+    m_checksumStart->addItem(QStringLiteral("帧首（默认）"), QVariant{});
+    m_checksumEnd->addItem(QStringLiteral("校验字段前（默认）"), QVariant{});
+    for (const Field &candidate : frame.fields) {
+        if (candidate.id == field.id) break;
+        const QString label = candidate.name.trimmed().isEmpty()
+            ? candidate.id.toString(QUuid::WithoutBraces) : candidate.name;
+        m_checksumStart->addItem(label, candidate.id);
+        m_checksumEnd->addItem(label, candidate.id);
+    }
+    m_checksumStart->setCurrentIndex(field.checksumStartFieldId.isNull()
+        ? 0 : m_checksumStart->findData(field.checksumStartFieldId));
+    m_checksumEnd->setCurrentIndex(field.checksumEndFieldId.isNull()
+        ? 0 : m_checksumEnd->findData(field.checksumEndFieldId));
+    m_lengthStart->clear();
+    m_lengthEnd->clear();
+    m_lengthStart->addItem(QStringLiteral("整帧（兼容模式）"), QVariant{});
+    m_lengthEnd->addItem(QStringLiteral("整帧（兼容模式）"), QVariant{});
+    for (const Field &candidate : frame.fields) {
+        if (candidate.id == field.id) continue;
+        const QString label = candidate.name.trimmed().isEmpty()
+            ? candidate.id.toString(QUuid::WithoutBraces) : candidate.name;
+        m_lengthStart->addItem(label, candidate.id);
+        m_lengthEnd->addItem(label, candidate.id);
+    }
+    m_lengthStart->setCurrentIndex(field.lengthStartFieldId.isNull()
+        ? 0 : m_lengthStart->findData(field.lengthStartFieldId));
+    m_lengthEnd->setCurrentIndex(field.lengthEndFieldId.isNull()
+        ? 0 : m_lengthEnd->findData(field.lengthEndFieldId));
+    m_sequenceGroup->setText(field.sequenceGroup);
     const QStringList messages = messagesFor(issues, frame.id, field.id);
     m_fieldErrors->setText(messages.join(QLatin1Char('\n')));
     m_fieldErrors->setVisible(!messages.isEmpty());
@@ -255,6 +286,8 @@ QWidget *ProtocolPropertyPanel::createFieldPage()
     addEnumItem(m_fieldRole, QStringLiteral("FrameId"), FieldRole::FrameId);
     addEnumItem(m_fieldRole, QStringLiteral("Length"), FieldRole::Length);
     addEnumItem(m_fieldRole, QStringLiteral("Data"), FieldRole::Data);
+    addEnumItem(m_fieldRole, QStringLiteral("Constant"), FieldRole::Constant);
+    addEnumItem(m_fieldRole, QStringLiteral("Sequence"), FieldRole::Sequence);
     addEnumItem(m_fieldRole, QStringLiteral("Checksum"), FieldRole::Checksum);
     addEnumItem(m_fieldRole, QStringLiteral("Tail"), FieldRole::Tail);
     addEnumItem(m_fieldRole, QStringLiteral("Skip"), FieldRole::Skip);
@@ -314,8 +347,32 @@ QWidget *ProtocolPropertyPanel::createFieldPage()
     addEnumItem(m_checksum, QStringLiteral("Sum8"), ChecksumAlgorithm::Sum8);
     addEnumItem(m_checksum, QStringLiteral("XOR8"), ChecksumAlgorithm::Xor8);
     addEnumItem(m_checksum, QStringLiteral("CRC8"), ChecksumAlgorithm::Crc8);
+    addEnumItem(m_checksum, QStringLiteral("CRC-16/CCITT (init 0x0000)"),
+                ChecksumAlgorithm::Crc16CcittZero);
     m_checksumRow = addRow(
         form, QStringLiteral("校验算法"), m_checksum);
+    m_checksumStart = new QComboBox(page);
+    m_checksumStart->setObjectName(QStringLiteral("protocolChecksumStartEditor"));
+    m_checksumStartRow = addRow(
+        form, QStringLiteral("校验起始字段"), m_checksumStart);
+    m_checksumEnd = new QComboBox(page);
+    m_checksumEnd->setObjectName(QStringLiteral("protocolChecksumEndEditor"));
+    m_checksumEndRow = addRow(
+        form, QStringLiteral("校验结束字段"), m_checksumEnd);
+
+    m_lengthStart = new QComboBox(page);
+    m_lengthStart->setObjectName(QStringLiteral("protocolLengthStartEditor"));
+    m_lengthStartRow = addRow(
+        form, QStringLiteral("计长起始字段"), m_lengthStart);
+    m_lengthEnd = new QComboBox(page);
+    m_lengthEnd->setObjectName(QStringLiteral("protocolLengthEndEditor"));
+    m_lengthEndRow = addRow(
+        form, QStringLiteral("计长结束字段"), m_lengthEnd);
+    m_sequenceGroup = new QLineEdit(page);
+    m_sequenceGroup->setObjectName(QStringLiteral("protocolSequenceGroupEditor"));
+    m_sequenceGroup->setPlaceholderText(QStringLiteral("default"));
+    m_sequenceGroupRow = addRow(
+        form, QStringLiteral("序列计数器组"), m_sequenceGroup);
 
     m_fieldErrors = new QLabel(page);
     m_fieldErrors->setProperty("validationMessage", true);
@@ -363,8 +420,24 @@ void ProtocolPropertyPanel::connectEditors()
             this, comboChanged);
     connect(m_byteOrder, &QComboBox::currentIndexChanged,
             this, comboChanged);
-    connect(m_checksum, &QComboBox::currentIndexChanged,
+    connect(m_checksum, &QComboBox::currentIndexChanged, this, [this] {
+        if (m_updating) return;
+        if (m_checksum->currentData().value<ChecksumAlgorithm>()
+            == ChecksumAlgorithm::Crc16CcittZero) {
+            m_byteCount->setValue(2);
+        }
+        submitField();
+    });
+    connect(m_checksumStart, &QComboBox::currentIndexChanged,
             this, comboChanged);
+    connect(m_checksumEnd, &QComboBox::currentIndexChanged,
+            this, comboChanged);
+    connect(m_lengthStart, &QComboBox::currentIndexChanged,
+            this, comboChanged);
+    connect(m_lengthEnd, &QComboBox::currentIndexChanged,
+            this, comboChanged);
+    connect(m_sequenceGroup, &QLineEdit::editingFinished,
+            this, &ProtocolPropertyPanel::submitField);
 }
 
 void ProtocolPropertyPanel::updateFieldVisibility()
@@ -372,14 +445,22 @@ void ProtocolPropertyPanel::updateFieldVisibility()
     const FieldRole role =
         m_fieldRole->currentData().value<FieldRole>();
     const bool typed = role == FieldRole::Data
-        || role == FieldRole::FrameId || role == FieldRole::Length;
+        || role == FieldRole::FrameId || role == FieldRole::Length
+        || role == FieldRole::Sequence;
     setFormRowVisible(m_typeRow, typed);
-    setFormRowVisible(m_byteOrderRow, typed);
+    setFormRowVisible(m_byteOrderRow,
+        typed || (role == FieldRole::Checksum && m_byteCount->value() > 1));
     setFormRowVisible(m_scaleRow, typed);
     setFormRowVisible(m_offsetRow, typed);
     setFormRowVisible(m_fixedHexRow,
-        role == FieldRole::Header || role == FieldRole::Tail);
+        role == FieldRole::Header || role == FieldRole::Tail
+        || role == FieldRole::Constant);
     setFormRowVisible(m_checksumRow, role == FieldRole::Checksum);
+    setFormRowVisible(m_checksumStartRow, role == FieldRole::Checksum);
+    setFormRowVisible(m_checksumEndRow, role == FieldRole::Checksum);
+    setFormRowVisible(m_lengthStartRow, role == FieldRole::Length);
+    setFormRowVisible(m_lengthEndRow, role == FieldRole::Length);
+    setFormRowVisible(m_sequenceGroupRow, role == FieldRole::Sequence);
 }
 
 void ProtocolPropertyPanel::submitFrame()
@@ -410,6 +491,11 @@ void ProtocolPropertyPanel::submitField()
     if (validHex) updated.fixedBytes = fixed;
     updated.checksumAlgorithm =
         m_checksum->currentData().value<ChecksumAlgorithm>();
+    updated.checksumStartFieldId = m_checksumStart->currentData().toUuid();
+    updated.checksumEndFieldId = m_checksumEnd->currentData().toUuid();
+    updated.lengthStartFieldId = m_lengthStart->currentData().toUuid();
+    updated.lengthEndFieldId = m_lengthEnd->currentData().toUuid();
+    updated.sequenceGroup = m_sequenceGroup->text().trimmed();
     updateFieldVisibility();
     updateHexValidation();
     if (updated == m_currentField) return;
@@ -430,7 +516,8 @@ void ProtocolPropertyPanel::updateHexValidation()
 {
     const FieldRole role =
         m_fieldRole->currentData().value<FieldRole>();
-    if (role != FieldRole::Header && role != FieldRole::Tail) {
+    if (role != FieldRole::Header && role != FieldRole::Tail
+        && role != FieldRole::Constant) {
         setInvalid(m_fixedHex, false);
         m_fixedHexError->clear();
         m_fixedHexError->hide();

@@ -2,6 +2,8 @@
 
 #include "services/CommunicationCodec.h"
 
+#include <QHash>
+
 class CustomBinaryCodec final
     : public CommunicationParser,
       public CustomBinaryEncoder
@@ -24,4 +26,5 @@ public:
 private:
     ProtocolDefinition m_protocol;
     mutable QByteArray m_receiveBuffer;
+    mutable QHash<QString, quint64> m_nextSequences;
 };
