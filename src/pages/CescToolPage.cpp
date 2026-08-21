@@ -20,6 +20,7 @@
 #include <QMessageBox>
 #include <QProgressBar>
 #include <QPushButton>
+#include <QTimer>
 #include <QVBoxLayout>
 
 CescToolPage::CescToolPage(AppContext *context, QWidget *parent)
@@ -203,7 +204,11 @@ CescToolPage::CescToolPage(AppContext *context, QWidget *parent)
                 updateActions();
                 if (state == CescSession::State::Ready
                     && !m_uploader->isBusy()) {
-                    m_uploader->requestFirmwareVersion();
+                    // Leave the serial readyRead stack before starting the
+                    // first business transaction after HELLO.
+                    QTimer::singleShot(
+                        0, m_uploader,
+                        &CescFirmwareUploader::requestFirmwareVersion);
                 }
             });
     connect(m_uploader, &CescFirmwareUploader::stateChanged, this,

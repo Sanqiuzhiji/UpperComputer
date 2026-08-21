@@ -27,10 +27,18 @@ bool CescTransactionManager::handleResponse(const Cesc::Packet &packet)
         || it->packet.serviceId!=packet.serviceId || it->packet.commandId!=packet.commandId) {
         emit unmatchedResponse(packet); return false;
     }
+    // Completion handlers may synchronously enqueue another request. Remove
+    // this entry before emitting signals so a QHash rehash cannot invalidate
+    // the iterator or make cleanup erase the newly inserted transaction.
+    auto *timer=it->timer;
+    timer->stop();
+    m_pending.erase(it);
+    timer->deleteLater();
+
     quint16 rawStatus; qsizetype pos=0;
     if(!Cesc::readU16(packet.payload,pos,rawStatus)) { emit failed(packet.sequence,tr("Malformed response status")); }
     else emit completed(packet.sequence,packet.serviceId,packet.commandId,Cesc::Status(rawStatus),packet.payload.mid(pos));
-    it->timer->stop(); it->timer->deleteLater(); m_pending.erase(it); return true;
+    return true;
 }
 
 void CescTransactionManager::timeout(quint16 sequence)
