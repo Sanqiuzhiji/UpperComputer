@@ -31,7 +31,7 @@ ReceiveDataPipeline::ReceiveDataPipeline(
 {
     m_monotonicClock.start();
     connect(connectionManager, &ConnectionManager::monitorDataReceived,
-            this, &ReceiveDataPipeline::handleData);
+            this, &ReceiveDataPipeline::handleData, Qt::QueuedConnection);
     connect(protocolRepository, &ProtocolRepository::protocolLibraryChanged,
             this, &ReceiveDataPipeline::rebuildParser);
     rebuildParser();
@@ -77,14 +77,15 @@ void ReceiveDataPipeline::setCustomProtocol(
 }
 
 void ReceiveDataPipeline::handleData(
-    const QByteArray &data, const CommunicationTrafficSource source)
+    const qint64 timestampUs, const QByteArray &data,
+    const CommunicationTrafficSource source)
 {
     if (data.isEmpty()) return;
     if (source == CommunicationTrafficSource::CescFirmware
         && !m_settings->showCescFirmwareTraffic()) {
         return;
     }
-    const qint64 nowUs = timestampUs();
+    const qint64 nowUs = timestampUs;
     emit rawDataReceived(nowUs, data);
     if (source == CommunicationTrafficSource::CescNative
         || source == CommunicationTrafficSource::CescFirmware) return;

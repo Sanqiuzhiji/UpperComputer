@@ -53,9 +53,9 @@ signals:
     void transmitTotalChanged(quint64 bytes);
     void dataReceived(const QByteArray &data);
     void dataSent(const QByteArray &data);
-    void monitorDataReceived(const QByteArray &data,
+    void monitorDataReceived(qint64 timestampUs, const QByteArray &data,
                              CommunicationTrafficSource source);
-    void monitorDataSent(const QByteArray &data,
+    void monitorDataSent(qint64 timestampUs, const QByteArray &data,
                          CommunicationTrafficSource source);
     void firmwareOperationActiveChanged(bool active);
     void errorOccurred(const QString &message);

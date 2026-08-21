@@ -2,14 +2,7 @@
     "canvas": {
         "plots": [
             {
-                "channels": [
-                    {
-                        "channelId": "cesc-v1/telemetry/1",
-                        "color": "#28a9e0",
-                        "lineWidth": 1.5,
-                        "visible": true
-                    }
-                ],
+                "channels": [],
                 "geometry": {
                     "height": 0.832,
                     "width": 0.8163265306122449,

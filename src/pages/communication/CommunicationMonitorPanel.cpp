@@ -195,9 +195,14 @@ void CommunicationMonitorPanel::setReceiveMode(const ParserMode mode)
 void CommunicationMonitorPanel::addEntry(
     const DataDirection direction, const QByteArray &bytes)
 {
+    addEntry(QDateTime::currentMSecsSinceEpoch() * 1000, direction, bytes);
+}
+
+void CommunicationMonitorPanel::addEntry(
+    const qint64 timestampUs, const DataDirection direction,
+    const QByteArray &bytes)
+{
     if (bytes.isEmpty()) return;
-    const qint64 timestampUs =
-        QDateTime::currentMSecsSinceEpoch() * 1000;
     if (direction == DataDirection::Receive) {
         addReceivedData(timestampUs, bytes);
         return;

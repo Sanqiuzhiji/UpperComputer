@@ -134,6 +134,9 @@ int main(int argc, char *argv[])
         QStringLiteral("plotTabBar"));
     if (!tabBar) return 10;
     PlotChannelDialog themeDialog(&context, {}, &page);
+    for (const PlotChannelStyle &style : themeDialog.styles()) {
+        if (style.visible) return 19;
+    }
     const QColor darkBase =
         plot->palette().color(QPalette::Base);
     const QColor darkCanvas =

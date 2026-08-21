@@ -5,6 +5,7 @@
 #include "services/transports/SerialTransport.h"
 #include "services/transports/VirtualTransport.h"
 
+#include <QDateTime>
 #include <QTimer>
 
 ConnectionManager::ConnectionManager(QObject *parent)
@@ -158,12 +159,13 @@ bool ConnectionManager::send(const QByteArray &data, QString *errorMessage,
         return false;
     }
     QString transportError;
+    const qint64 timestampUs = QDateTime::currentMSecsSinceEpoch() * 1000;
     if (!m_transport->write(data, &transportError)) {
         if (errorMessage) *errorMessage = transportError;
         return false;
     }
     emit dataSent(data);
-    emit monitorDataSent(data, source);
+    emit monitorDataSent(timestampUs, data, source);
     return true;
 }
 
@@ -208,6 +210,8 @@ void ConnectionManager::createTransport(const TransportType type)
             this, &ConnectionManager::errorOccurred);
     connect(m_transport, &AbstractTransport::dataReceived, this,
             [this](const QByteArray &data) {
+                const qint64 timestampUs =
+                    QDateTime::currentMSecsSinceEpoch() * 1000;
                 const CommunicationTrafficSource source =
                     m_firmwareOperationActive
                         ? CommunicationTrafficSource::CescFirmware
@@ -216,8 +220,10 @@ void ConnectionManager::createTransport(const TransportType type)
                             : CommunicationTrafficSource::NormalCommunication);
                 m_receiveTotal += static_cast<quint64>(data.size());
                 emit receiveTotalChanged(m_receiveTotal);
+                // Queue the monitor event before protocol handling so a
+                // response-triggered TX cannot appear ahead of this RX.
+                emit monitorDataReceived(timestampUs, data, source);
                 emit dataReceived(data);
-                emit monitorDataReceived(data, source);
             });
     connect(m_transport, &AbstractTransport::dataWritten, this,
             [this](const qint64 bytes) {

@@ -31,6 +31,8 @@ public:
 public slots:
     void setReceiveMode(ParserMode mode);
     void addEntry(DataDirection direction, const QByteArray &bytes);
+    void addEntry(qint64 timestampUs, DataDirection direction,
+                  const QByteArray &bytes);
     void addReceivedData(qint64 timestampUs, const QByteArray &bytes);
     void addParsedMessages(
         qint64 timestampUs, const QList<ParsedMessage> &messages);

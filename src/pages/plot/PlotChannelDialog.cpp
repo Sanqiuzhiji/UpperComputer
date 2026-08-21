@@ -103,7 +103,7 @@ void PlotChannelDialog::populate()
         auto *item = new QTreeWidgetItem(m_list);
         item->setCheckState(
             VisibleColumn,
-            style.channelId.isEmpty() || style.visible
+            !style.channelId.isEmpty() && style.visible
                 ? Qt::Checked : Qt::Unchecked);
         item->setText(NameColumn, channel.displayName);
         item->setToolTip(NameColumn, channel.id);

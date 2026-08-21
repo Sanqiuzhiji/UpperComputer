@@ -88,14 +88,15 @@ CommunicationPage::CommunicationPage(
                 notify(message, NotificationType::Warning);
             });
     connect(manager, &ConnectionManager::monitorDataSent, this,
-            [this](const QByteArray &bytes,
+            [this](const qint64 timestampUs, const QByteArray &bytes,
                    const CommunicationTrafficSource source) {
                 if (source == CommunicationTrafficSource::CescFirmware
                     && !m_context->settings()->showCescFirmwareTraffic()) {
                     return;
                 }
-                m_monitorPanel->addEntry(DataDirection::Transmit, bytes);
-            });
+                m_monitorPanel->addEntry(
+                    timestampUs, DataDirection::Transmit, bytes);
+            }, Qt::QueuedConnection);
     connect(manager, &ConnectionManager::errorOccurred, this,
             [this](const QString &error) {
                 notify(tr("连接或通信失败：%1").arg(error),

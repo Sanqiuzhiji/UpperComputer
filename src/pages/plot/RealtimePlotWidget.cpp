@@ -36,7 +36,9 @@ RealtimePlotWidget::RealtimePlotWidget(
     setFocusPolicy(Qt::StrongFocus);
     setPalette(PlotTheme::palette(context->themeManager()->mode()));
     m_refreshTimer->setTimerType(Qt::PreciseTimer);
-    m_refreshTimer->setInterval(16);
+    // 30 FPS is ample for telemetry while leaving the GUI thread enough time
+    // for input and layout work when several dense channels are visible.
+    m_refreshTimer->setInterval(33);
     connect(m_refreshTimer, &QTimer::timeout,
             this, &RealtimePlotWidget::refreshData);
     connect(context->themeManager(), &ThemeManager::themeChanged,
@@ -153,8 +155,13 @@ void RealtimePlotWidget::updateYRange(const bool immediate)
         }
     }
     if (minimum > maximum) return;
-    const double range = qMax(1.0, maximum - minimum);
     double center = (minimum + maximum) * 0.5;
+    // Prevent tiny fluctuations on a large DC value from being expanded to
+    // the full plot height. Besides producing a more useful default view,
+    // this bounds the raster work for dense, quantized signals. Manual Y-axis
+    // zoom remains unrestricted because this rule only applies to auto-fit.
+    const double minimumRange = qMax(1.0, std::abs(center) * 0.01);
+    const double range = qMax(minimumRange, maximum - minimum);
     if (m_yRangeInitialized && !immediate) {
         const double currentCenter = (m_minimumY + m_maximumY) * 0.5;
         const double currentRange = m_maximumY - m_minimumY;
@@ -203,9 +210,14 @@ QPointF RealtimePlotWidget::mapSample(
 QVector<ChannelSample> RealtimePlotWidget::downsample(
     const QVector<ChannelSample> &samples, const int pixelWidth) const
 {
-    if (samples.size() <= pixelWidth * 2 || pixelWidth <= 0) return samples;
+    if (pixelWidth <= 0 || samples.isEmpty()) return samples;
+    // A curve cannot convey independent detail for every sample once several
+    // points occupy the same few horizontal pixels. Two extrema per 4-pixel
+    // bucket retain spikes and transitions while bounding paint complexity.
+    const int bucketCount = qMax(1, (pixelWidth + 3) / 4);
+    if (samples.size() <= bucketCount * 2) return samples;
     QVector<ChannelSample> result;
-    result.reserve(pixelWidth * 2);
+    result.reserve(bucketCount * 2);
     const double span = qMax<qint64>(
         1, m_maximumTimeUs - m_minimumTimeUs);
     int start = 0;
@@ -214,16 +226,16 @@ QVector<ChannelSample> RealtimePlotWidget::downsample(
             0,
             static_cast<int>(
                 (samples.at(start).timestampUs - m_minimumTimeUs)
-                / span * pixelWidth),
-            pixelWidth - 1);
+                / span * bucketCount),
+            bucketCount - 1);
         int end = start + 1;
         while (end < samples.size()) {
             const int nextBucket = qBound(
                 0,
                 static_cast<int>(
                     (samples.at(end).timestampUs - m_minimumTimeUs)
-                    / span * pixelWidth),
-                pixelWidth - 1);
+                    / span * bucketCount),
+                bucketCount - 1);
             if (nextBucket != bucket) break;
             ++end;
         }
