@@ -8,6 +8,8 @@
 #include "services/cesc/CescSystemClient.h"
 #include "services/cesc/CescSensorClient.h"
 #include "services/cesc/CescTelemetryClient.h"
+#include "services/cesc/CescMotorClient.h"
+#include "services/cesc/CescConfigurationClient.h"
 #include "services/ProtocolRepository.h"
 #include "services/ReceiveDataPipeline.h"
 #include "theme/IconManager.h"
@@ -39,6 +41,8 @@ AppContext::AppContext(QObject *parent)
     m_cescSensorClient = new CescSensorClient(m_cescSession, this);
     m_cescTelemetryClient = new CescTelemetryClient(
         m_cescSession, m_channelDataHub, this);
+    m_cescMotorClient = new CescMotorClient(m_cescSession, this);
+    m_cescConfigurationClient = new CescConfigurationClient(m_cescSession, this);
     connect(m_protocolRepository,
             &ProtocolRepository::notificationRequested,
             this, &AppContext::notify,
@@ -78,6 +82,8 @@ CescSession *AppContext::cescSession() const noexcept { return m_cescSession; }
 CescSystemClient *AppContext::cescSystemClient() const noexcept { return m_cescSystemClient; }
 CescSensorClient *AppContext::cescSensorClient() const noexcept { return m_cescSensorClient; }
 CescTelemetryClient *AppContext::cescTelemetryClient() const noexcept { return m_cescTelemetryClient; }
+CescMotorClient *AppContext::cescMotorClient() const noexcept { return m_cescMotorClient; }
+CescConfigurationClient *AppContext::cescConfigurationClient() const noexcept { return m_cescConfigurationClient; }
 
 ThemeManager *AppContext::themeManager() const noexcept
 {

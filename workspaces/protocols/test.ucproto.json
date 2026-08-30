@@ -1,45 +1,425 @@
 {
-  "schemaVersion": 1,
-  "id": "4edc6947-184a-4f11-ad01-75c66bd33581",
-  "name": "test",
-  "frames": [
-    {
-      "id": "f808bcfc-158b-4f39-8908-49608597e77a",
-      "name": "CESC_HELLO_REQUEST",
-      "direction": "transmitOnly",
-      "fields": [
-        {"id":"93dc34b9-907d-4614-8b11-3798b167dcea","name":"Magic","role":"header","dataType":"bytes","byteCount":2,"fixedHex":"43 45"},
-        {"id":"1efa92dd-7ef7-403b-9178-fa92d9f888e6","name":"Version","role":"constant","dataType":"bytes","byteCount":1,"fixedHex":"01"},
-        {"id":"b9331a00-861d-4ff8-b05b-618bf86f27f9","name":"MessageType","role":"constant","dataType":"bytes","byteCount":1,"fixedHex":"00"},
-        {"id":"53578410-acd8-4f01-b97e-17d2eaeb3f7d","name":"ServiceId","role":"constant","dataType":"bytes","byteCount":1,"fixedHex":"00"},
-        {"id":"b05eb0c0-2965-472e-a862-028dd3bc8980","name":"CommandId","role":"constant","dataType":"bytes","byteCount":1,"fixedHex":"00"},
-        {"id":"82ce0c74-2446-4825-838d-5e6eede956c1","name":"Sequence","role":"sequence","dataType":"uint16","byteCount":2,"byteOrder":"littleEndian"},
-        {"id":"d065e985-8d00-4fe1-bb1a-9fc0b0f62a65","name":"PayloadLength","role":"length","dataType":"uint16","byteCount":2,"byteOrder":"littleEndian","lengthStartFieldId":"66a20373-d9b6-49ef-85b5-5e72a242fde0","lengthEndFieldId":"bb41f33a-c0f6-4b41-ba68-319e7aadc7d4"},
-        {"id":"66a20373-d9b6-49ef-85b5-5e72a242fde0","name":"minimumVersion","role":"constant","dataType":"bytes","byteCount":1,"fixedHex":"01"},
-        {"id":"dd52ad6c-702c-497a-9e23-0aa9aaa8c403","name":"maximumVersion","role":"constant","dataType":"bytes","byteCount":1,"fixedHex":"01"},
-        {"id":"bb41f33a-c0f6-4b41-ba68-319e7aadc7d4","name":"hostCapabilities","role":"constant","dataType":"bytes","byteCount":4,"fixedHex":"00 00 00 00"},
-        {"id":"abf3584a-3bae-4633-bc5a-00c9c99abffc","name":"CRC16","role":"checksum","dataType":"bytes","byteCount":2,"byteOrder":"littleEndian","checksumAlgorithm":"crc16CcittZero","checksumStartFieldId":"1efa92dd-7ef7-403b-9178-fa92d9f888e6","checksumEndFieldId":"bb41f33a-c0f6-4b41-ba68-319e7aadc7d4"}
-      ]
-    },
-    {
-      "id": "50b875b0-0ad9-4a10-ae44-846263d814aa",
-      "name": "CESC_HELLO_RESPONSE",
-      "direction": "receiveOnly",
-      "fields": [
-        {"id":"2baa308f-d15c-43c7-84e5-01ade84d4881","name":"Magic","role":"header","dataType":"bytes","byteCount":2,"fixedHex":"43 45"},
-        {"id":"2e759cea-667f-47b7-83cc-f69ef58656bd","name":"Version","role":"constant","dataType":"bytes","byteCount":1,"fixedHex":"01"},
-        {"id":"08b7072e-e1fa-4a14-a09f-d44656597d71","name":"MessageType","role":"constant","dataType":"bytes","byteCount":1,"fixedHex":"01"},
-        {"id":"50170eb7-0054-41ee-ae9d-b1cb07e484da","name":"ServiceId","role":"constant","dataType":"bytes","byteCount":1,"fixedHex":"00"},
-        {"id":"7c0e88ef-9144-40a7-84d9-a03bd71543cf","name":"CommandId","role":"constant","dataType":"bytes","byteCount":1,"fixedHex":"00"},
-        {"id":"da599b90-4ec0-40e7-a645-a37057cc2db2","name":"Sequence","role":"sequence","dataType":"uint16","byteCount":2,"byteOrder":"littleEndian"},
-        {"id":"23a81b98-c685-49d1-b767-e79f50043778","name":"PayloadLength","role":"length","dataType":"uint16","byteCount":2,"byteOrder":"littleEndian","lengthStartFieldId":"33f0f0af-f730-4c40-978c-e9bd68ecf46b","lengthEndFieldId":"e08b2139-159e-42d8-9fe7-c84ad7a40383"},
-        {"id":"33f0f0af-f730-4c40-978c-e9bd68ecf46b","name":"Status","role":"data","dataType":"uint16","byteCount":2,"byteOrder":"littleEndian"},
-        {"id":"0dc7a35d-85c4-477e-af79-a69769cf0ae1","name":"selectedVersion","role":"data","dataType":"uint8","byteCount":1},
-        {"id":"49673012-0d4f-4706-ab98-259683af03cc","name":"maximumPayloadLength","role":"data","dataType":"uint16","byteCount":2,"byteOrder":"littleEndian"},
-        {"id":"d26e2dc9-1a43-4416-b01b-659356ff53d7","name":"deviceCapabilities","role":"data","dataType":"uint64","byteCount":8,"byteOrder":"littleEndian"},
-        {"id":"e08b2139-159e-42d8-9fe7-c84ad7a40383","name":"sessionId","role":"data","dataType":"uint32","byteCount":4,"byteOrder":"littleEndian"},
-        {"id":"757dc7a3-36ed-441e-a9db-af3b5c3259bc","name":"CRC16","role":"checksum","dataType":"bytes","byteCount":2,"byteOrder":"littleEndian","checksumAlgorithm":"crc16CcittZero","checksumStartFieldId":"2e759cea-667f-47b7-83cc-f69ef58656bd","checksumEndFieldId":"e08b2139-159e-42d8-9fe7-c84ad7a40383"}
-      ]
-    }
-  ]
+    "frames": [
+        {
+            "direction": "transmitOnly",
+            "fields": [
+                {
+                    "byteCount": 2,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "43 45",
+                    "id": "93dc34b9-907d-4614-8b11-3798b167dcea",
+                    "name": "Magic",
+                    "offset": 0,
+                    "role": "header",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "01",
+                    "id": "1efa92dd-7ef7-403b-9178-fa92d9f888e6",
+                    "name": "Version",
+                    "offset": 0,
+                    "role": "constant",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "00",
+                    "id": "b9331a00-861d-4ff8-b05b-618bf86f27f9",
+                    "name": "MessageType",
+                    "offset": 0,
+                    "role": "constant",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "00",
+                    "id": "53578410-acd8-4f01-b97e-17d2eaeb3f7d",
+                    "name": "ServiceId",
+                    "offset": 0,
+                    "role": "constant",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "00",
+                    "id": "b05eb0c0-2965-472e-a862-028dd3bc8980",
+                    "name": "CommandId",
+                    "offset": 0,
+                    "role": "constant",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 2,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "uint16",
+                    "fixedHex": "",
+                    "id": "82ce0c74-2446-4825-838d-5e6eede956c1",
+                    "name": "Sequence",
+                    "offset": 0,
+                    "role": "sequence",
+                    "scale": 1,
+                    "sequenceGroup": "default"
+                },
+                {
+                    "byteCount": 2,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "uint16",
+                    "fixedHex": "",
+                    "id": "d065e985-8d00-4fe1-bb1a-9fc0b0f62a65",
+                    "lengthEndFieldId": "bb41f33a-c0f6-4b41-ba68-319e7aadc7d4",
+                    "lengthStartFieldId": "66a20373-d9b6-49ef-85b5-5e72a242fde0",
+                    "name": "PayloadLength",
+                    "offset": 0,
+                    "role": "length",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "01",
+                    "id": "66a20373-d9b6-49ef-85b5-5e72a242fde0",
+                    "name": "minimumVersion",
+                    "offset": 0,
+                    "role": "constant",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "01",
+                    "id": "dd52ad6c-702c-497a-9e23-0aa9aaa8c403",
+                    "name": "maximumVersion",
+                    "offset": 0,
+                    "role": "constant",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 4,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "00 00 00 00",
+                    "id": "bb41f33a-c0f6-4b41-ba68-319e7aadc7d4",
+                    "name": "hostCapabilities",
+                    "offset": 0,
+                    "role": "constant",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 2,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "crc16CcittZero",
+                    "checksumEndFieldId": "bb41f33a-c0f6-4b41-ba68-319e7aadc7d4",
+                    "checksumStartFieldId": "1efa92dd-7ef7-403b-9178-fa92d9f888e6",
+                    "dataType": "bytes",
+                    "fixedHex": "",
+                    "id": "abf3584a-3bae-4633-bc5a-00c9c99abffc",
+                    "name": "CRC16",
+                    "offset": 0,
+                    "role": "checksum",
+                    "scale": 1
+                }
+            ],
+            "id": "f808bcfc-158b-4f39-8908-49608597e77a",
+            "name": "CESC_HELLO_REQUEST"
+        },
+        {
+            "direction": "receiveOnly",
+            "fields": [
+                {
+                    "byteCount": 2,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "43 45",
+                    "id": "2baa308f-d15c-43c7-84e5-01ade84d4881",
+                    "name": "Magic",
+                    "offset": 0,
+                    "role": "header",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "01",
+                    "id": "2e759cea-667f-47b7-83cc-f69ef58656bd",
+                    "name": "Version",
+                    "offset": 0,
+                    "role": "constant",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "01",
+                    "id": "08b7072e-e1fa-4a14-a09f-d44656597d71",
+                    "name": "MessageType",
+                    "offset": 0,
+                    "role": "constant",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "00",
+                    "id": "50170eb7-0054-41ee-ae9d-b1cb07e484da",
+                    "name": "ServiceId",
+                    "offset": 0,
+                    "role": "constant",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "00",
+                    "id": "7c0e88ef-9144-40a7-84d9-a03bd71543cf",
+                    "name": "CommandId",
+                    "offset": 0,
+                    "role": "constant",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 2,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "uint16",
+                    "fixedHex": "",
+                    "id": "da599b90-4ec0-40e7-a645-a37057cc2db2",
+                    "name": "Sequence",
+                    "offset": 0,
+                    "role": "sequence",
+                    "scale": 1,
+                    "sequenceGroup": "default"
+                },
+                {
+                    "byteCount": 2,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "uint16",
+                    "fixedHex": "",
+                    "id": "23a81b98-c685-49d1-b767-e79f50043778",
+                    "lengthEndFieldId": "e08b2139-159e-42d8-9fe7-c84ad7a40383",
+                    "lengthStartFieldId": "33f0f0af-f730-4c40-978c-e9bd68ecf46b",
+                    "name": "PayloadLength",
+                    "offset": 0,
+                    "role": "length",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 2,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "uint16",
+                    "fixedHex": "",
+                    "id": "33f0f0af-f730-4c40-978c-e9bd68ecf46b",
+                    "name": "Status",
+                    "offset": 0,
+                    "role": "data",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "uint8",
+                    "fixedHex": "",
+                    "id": "0dc7a35d-85c4-477e-af79-a69769cf0ae1",
+                    "name": "selectedVersion",
+                    "offset": 0,
+                    "role": "data",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 2,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "uint16",
+                    "fixedHex": "",
+                    "id": "49673012-0d4f-4706-ab98-259683af03cc",
+                    "name": "maximumPayloadLength",
+                    "offset": 0,
+                    "role": "data",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 8,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "uint64",
+                    "fixedHex": "",
+                    "id": "d26e2dc9-1a43-4416-b01b-659356ff53d7",
+                    "name": "deviceCapabilities",
+                    "offset": 0,
+                    "role": "data",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 4,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "uint32",
+                    "fixedHex": "",
+                    "id": "e08b2139-159e-42d8-9fe7-c84ad7a40383",
+                    "name": "sessionId",
+                    "offset": 0,
+                    "role": "data",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 2,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "crc16CcittZero",
+                    "checksumEndFieldId": "e08b2139-159e-42d8-9fe7-c84ad7a40383",
+                    "checksumStartFieldId": "2e759cea-667f-47b7-83cc-f69ef58656bd",
+                    "dataType": "bytes",
+                    "fixedHex": "",
+                    "id": "757dc7a3-36ed-441e-a9db-af3b5c3259bc",
+                    "name": "CRC16",
+                    "offset": 0,
+                    "role": "checksum",
+                    "scale": 1
+                }
+            ],
+            "id": "50b875b0-0ad9-4a10-ae44-846263d814aa",
+            "name": "CESC_HELLO_RESPONSE"
+        },
+        {
+            "direction": "transmitOnly",
+            "fields": [
+                {
+                    "byteCount": 2,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "43 45",
+                    "id": "57684e41-f886-4392-bf62-e6f89669c65b",
+                    "name": "Magic",
+                    "offset": 0,
+                    "role": "header",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "01",
+                    "id": "4530e743-68ec-46ee-a789-dc6d422ade32",
+                    "name": "Version",
+                    "offset": 0,
+                    "role": "constant",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "00",
+                    "id": "f2cddf54-94bb-4745-a43f-951bc9864ba4",
+                    "name": "MessageType",
+                    "offset": 0,
+                    "role": "constant",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "05",
+                    "id": "3ccbca13-71e8-4851-b4d4-63f54d896ef0",
+                    "name": "constant",
+                    "offset": 0,
+                    "role": "constant",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 1,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "06",
+                    "id": "97f7b7be-edad-46ac-bb4e-3aa99b253984",
+                    "name": "constant2",
+                    "offset": 0,
+                    "role": "constant",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 2,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "uint16",
+                    "fixedHex": "",
+                    "id": "cba5ed13-6759-4e59-bc76-00279e44ba89",
+                    "name": "sequence",
+                    "offset": 0,
+                    "role": "sequence",
+                    "scale": 1,
+                    "sequenceGroup": "default"
+                },
+                {
+                    "byteCount": 2,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "sum8",
+                    "dataType": "bytes",
+                    "fixedHex": "00 00",
+                    "id": "2acb1266-2d1b-48c9-811e-0912f98a1f54",
+                    "name": "constant3",
+                    "offset": 0,
+                    "role": "constant",
+                    "scale": 1
+                },
+                {
+                    "byteCount": 2,
+                    "byteOrder": "littleEndian",
+                    "checksumAlgorithm": "crc16CcittZero",
+                    "checksumEndFieldId": "2acb1266-2d1b-48c9-811e-0912f98a1f54",
+                    "checksumStartFieldId": "4530e743-68ec-46ee-a789-dc6d422ade32",
+                    "dataType": "bytes",
+                    "fixedHex": "",
+                    "id": "be3a6b71-c920-47b6-883a-45721c183970",
+                    "name": "CRC16",
+                    "offset": 0,
+                    "role": "checksum",
+                    "scale": 1
+                }
+            ],
+            "id": "a8eee7c7-d2f1-41d9-94cb-d51e69bd635f",
+            "name": "Phase Resistance"
+        }
+    ],
+    "id": "4edc6947-184a-4f11-ad01-75c66bd33581",
+    "name": "test",
+    "schemaVersion": 1
 }

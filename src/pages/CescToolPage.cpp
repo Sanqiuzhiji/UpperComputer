@@ -1,400 +1,90 @@
 #include "CescToolPage.h"
-
 #include "app/AppContext.h"
-#include "app/AppSettings.h"
 #include "models/AppTypes.h"
+#include "app/AppSettings.h"
 #include "services/CescFirmwareUploader.h"
 #include "services/ConnectionManager.h"
 #include "services/cesc/CescSession.h"
 #include "services/cesc/CescSensorClient.h"
 #include "services/cesc/CescTelemetryClient.h"
-
-#include <QFile>
-#include <QFileDialog>
-#include <QFileInfo>
+#include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QFile>
+#include <QFileDialog>
+#include <QFileInfo>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QMessageBox>
-#include <QProgressBar>
 #include <QPushButton>
+#include <QProgressBar>
+#include <QScrollArea>
+#include <QSpinBox>
+#include <QStackedWidget>
 #include <QTimer>
+#include <QTime>
+#include <QDateTime>
 #include <QVBoxLayout>
 
-CescToolPage::CescToolPage(AppContext *context, QWidget *parent)
-    : QWidget(parent), m_context(context),
-      m_uploader(context->cescFirmwareUploader())
-{
-    auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(28, 24, 28, 28);
-    layout->setSpacing(16);
-    auto *title = new QLabel(QStringLiteral("CESC Tool"), this);
-    title->setObjectName(QStringLiteral("pageTitle"));
-    auto *subtitle = new QLabel(tr("通过当前共享串口连接为下位机烧录 CESC 固件"), this);
-    subtitle->setProperty("muted", true);
-    layout->addWidget(title);
-    layout->addWidget(subtitle);
-
-    auto *deviceCard = new QFrame(this);
-    deviceCard->setProperty("card", true);
-    auto *deviceLayout = new QGridLayout(deviceCard);
-    deviceLayout->setContentsMargins(24, 18, 24, 18);
-    deviceLayout->setHorizontalSpacing(20);
-    deviceLayout->addWidget(new QLabel(tr("当前设备"), deviceCard), 0, 0, 1, 4);
-    deviceLayout->addWidget(new QLabel(tr("串口"), deviceCard), 1, 0);
-    deviceLayout->addWidget(new QLabel(tr("波特率"), deviceCard), 1, 1);
-    deviceLayout->addWidget(new QLabel(tr("连接状态"), deviceCard), 1, 2);
-    deviceLayout->addWidget(new QLabel(tr("固件版本"), deviceCard), 1, 3);
-    m_portValue = new QLabel(deviceCard);
-    m_baudValue = new QLabel(deviceCard);
-    m_connectionValue = new QLabel(deviceCard);
-    m_versionValue = new QLabel(deviceCard);
-    for (QLabel *label : {m_portValue, m_baudValue, m_connectionValue,
-                          m_versionValue}) {
-        QFont font = label->font(); font.setBold(true); label->setFont(font);
-    }
-    deviceLayout->addWidget(m_portValue, 2, 0);
-    deviceLayout->addWidget(m_baudValue, 2, 1);
-    deviceLayout->addWidget(m_connectionValue, 2, 2);
-    deviceLayout->addWidget(m_versionValue, 2, 3);
-    m_connectionButton = new QPushButton(deviceCard);
-    deviceLayout->addWidget(m_connectionButton, 1, 4, 2, 1);
-    layout->addWidget(deviceCard);
-
-    auto *angleCard = new QFrame(this);
-    angleCard->setProperty("card", true);
-    auto *angleLayout = new QGridLayout(angleCard);
-    angleLayout->setContentsMargins(24, 18, 24, 18);
-    angleLayout->setHorizontalSpacing(18);
-    auto *angleTitle = new QLabel(tr("Angle sensor and telemetry"), angleCard);
-    angleTitle->setObjectName(QStringLiteral("sectionTitle"));
-    angleLayout->addWidget(angleTitle, 0, 0, 1, 6);
-    angleLayout->addWidget(new QLabel(tr("Angle"), angleCard), 1, 0);
-    angleLayout->addWidget(new QLabel(tr("Raw"), angleCard), 1, 1);
-    angleLayout->addWidget(new QLabel(tr("Sensor status"), angleCard), 1, 2);
-    m_angleValue = new QLabel(QStringLiteral("-- deg"), angleCard);
-    m_rawAngleValue = new QLabel(QStringLiteral("--"), angleCard);
-    m_sensorStatusValue = new QLabel(tr("Unknown"), angleCard);
-    m_streamStatus = new QLabel(tr("Stopped"), angleCard);
-    angleLayout->addWidget(m_angleValue, 2, 0);
-    angleLayout->addWidget(m_rawAngleValue, 2, 1);
-    angleLayout->addWidget(m_sensorStatusValue, 2, 2);
-    angleLayout->addWidget(m_streamStatus, 2, 3);
-    m_queryAngleButton = new QPushButton(tr("Read once"), angleCard);
-    m_telemetryButton = new QPushButton(tr("Start telemetry"), angleCard);
-    m_telemetryButton->setProperty("accent", true);
-    angleLayout->addWidget(m_queryAngleButton, 1, 4, 2, 1);
-    angleLayout->addWidget(m_telemetryButton, 1, 5, 2, 1);
-    auto *plotHint = new QLabel(
-        tr("After telemetry starts, open Plot and select the CESC V1 channels "
-           "shaft_angle, shaft_angle_raw or shaft_sensor_status."), angleCard);
-    plotHint->setWordWrap(true);
-    plotHint->setProperty("muted", true);
-    angleLayout->addWidget(plotHint, 3, 0, 1, 6);
-    layout->addWidget(angleCard);
-
-    auto *card = new QFrame(this);
-    card->setProperty("card", true);
-    auto *cardLayout = new QVBoxLayout(card);
-    cardLayout->setContentsMargins(24, 24, 24, 24);
-    cardLayout->setSpacing(14);
-    auto *section = new QLabel(tr("固件烧录"), card);
-    section->setObjectName(QStringLiteral("sectionTitle"));
-    cardLayout->addWidget(section);
-    auto *fileRow = new QHBoxLayout;
-    m_filePath = new QLineEdit(card);
-    m_filePath->setReadOnly(true);
-    m_filePath->setPlaceholderText(tr("请选择 .bin 固件文件"));
-    m_chooseButton = new QPushButton(tr("浏览..."), card);
-    fileRow->addWidget(m_filePath, 1);
-    fileRow->addWidget(m_chooseButton);
-    cardLayout->addLayout(fileRow);
-    m_fileInfo = new QLabel(tr("尚未选择固件"), card);
-    m_fileInfo->setProperty("muted", true);
-    cardLayout->addWidget(m_fileInfo);
-    m_progress = new QProgressBar(card);
-    m_progress->setRange(0, 100);
-    m_progress->setValue(m_uploader->progress());
-    m_status = new QLabel(m_uploader->statusText().isEmpty()
-                              ? tr("等待烧录") : m_uploader->statusText(), card);
-    m_status->setProperty("muted", true);
-    cardLayout->addWidget(m_progress);
-    cardLayout->addWidget(m_status);
-    auto *buttons = new QHBoxLayout;
-    buttons->addStretch();
-    m_cancelButton = new QPushButton(tr("取消"), card);
-    m_uploadButton = new QPushButton(tr("开始烧录"), card);
-    m_uploadButton->setProperty("accent", true);
-    buttons->addWidget(m_cancelButton);
-    buttons->addWidget(m_uploadButton);
-    cardLayout->addLayout(buttons);
-    auto *warning = new QLabel(tr("烧录期间请勿断开设备或关闭串口。"), card);
-    warning->setProperty("muted", true);
-    cardLayout->addWidget(warning);
-    layout->addWidget(card);
-    layout->addStretch();
-
-    auto *manager = context->connectionManager();
-    connect(m_chooseButton, &QPushButton::clicked, this, &CescToolPage::chooseFirmware);
-    connect(m_uploadButton, &QPushButton::clicked, this, &CescToolPage::startUpload);
-    connect(m_cancelButton, &QPushButton::clicked, m_uploader, &CescFirmwareUploader::cancel);
-    connect(m_queryAngleButton, &QPushButton::clicked,
-            this, &CescToolPage::queryAngle);
-    connect(m_telemetryButton, &QPushButton::clicked, this, [this] {
-        if (m_angleStreamId != 0U
-            || m_context->cescTelemetryClient()->activeStreamId() != 0U) {
-            stopAngleStream();
-        } else {
-            startAngleStream();
-        }
-    });
-    connect(context->cescSensorClient(), &CescSensorClient::sampleReceived,
-            this, [this](const CescSensorClient::Sample &sample) {
-                m_angleValue->setText(QStringLiteral("%1 deg").arg(sample.degrees, 0, 'f', 2));
-                m_rawAngleValue->setText(QString::number(sample.rawAngle));
-                m_sensorStatusValue->setText(QString::number(sample.status));
-            });
-    connect(context->cescSensorClient(), &CescSensorClient::commandFailed,
-            this, [this](const QString &message) {
-                m_context->notify(message, NotificationType::Error);
-            });
-    connect(context->cescTelemetryClient(), &CescTelemetryClient::subscribed,
-            this, [this](quint16 streamId) {
-                m_angleStreamId = streamId;
-                m_streamStatus->setText(tr("Streaming (ID %1, 100 Hz)").arg(streamId));
-                updateActions();
-            });
-    connect(context->cescTelemetryClient(), &CescTelemetryClient::commandFailed,
-            this, [this](const QString &message) {
-                m_streamStatus->setText(message);
-                m_context->notify(message, NotificationType::Error);
-                updateActions();
-            });
-    connect(m_connectionButton, &QPushButton::clicked, this, [this, manager] {
-        if (manager->state() == ConnectionState::Connected
-            || manager->state() == ConnectionState::Connecting) {
-            manager->disconnectTransport();
-            return;
-        }
-        const SerialConfig config = m_context->settings()->serialConfig();
-        if (config.portName.trimmed().isEmpty()) {
-            m_context->notify(tr("请先在 Communication 页面选择串口"), NotificationType::Warning);
-            return;
-        }
-        manager->connectTransport(TransportType::SerialPort, config);
-    });
-    connect(manager, &ConnectionManager::stateChanged, this, [this] {
-        updateConnectionUi(); updateActions();
-        if (m_context->connectionManager()->state()
-            == ConnectionState::Connected) {
-            m_context->cescSession()->setEnabled(true);
-        } else if (m_context->connectionManager()->state()
-                   == ConnectionState::Disconnected) {
-            m_angleStreamId = 0U;
-            m_streamStatus->setText(tr("Stopped"));
-        }
-    });
-    connect(manager, &ConnectionManager::deviceNameChanged,
-            this, [this] { updateConnectionUi(); });
-    connect(context->cescSession(), &CescSession::stateChanged, this,
-            [this](CescSession::State state) {
-                updateConnectionUi();
-                updateActions();
-                if (state == CescSession::State::Ready
-                    && !m_uploader->isBusy()) {
-                    // Leave the serial readyRead stack before starting the
-                    // first business transaction after HELLO.
-                    QTimer::singleShot(
-                        0, m_uploader,
-                        &CescFirmwareUploader::requestFirmwareVersion);
-                }
-            });
-    connect(m_uploader, &CescFirmwareUploader::stateChanged, this,
-            [this](CescFirmwareUploader::State state, int progress,
-                   const QString &status) {
-                const bool recovering =
-                    state == CescFirmwareUploader::State::Rebooting
-                    || state == CescFirmwareUploader::State::ReadingVersion;
-                m_progress->setRange(0, recovering ? 0 : 100);
-                if (!recovering) m_progress->setValue(progress);
-                m_status->setText(status);
-                updateActions();
-            });
-    connect(m_uploader, &CescFirmwareUploader::finished, this,
-            [this](bool success, const QString &message) {
-                m_context->notify(message, success ? NotificationType::Success
-                                                   : NotificationType::Error);
-            });
-    connect(m_uploader, &CescFirmwareUploader::firmwareVersionChanged,
-            m_versionValue, &QLabel::setText);
-    connect(context->settings(), &AppSettings::cescFirmwarePathChanged,
-            this, [this](const QString &path) {
-                if (!m_uploader->isBusy()) applyFirmwarePath(path);
-            });
-    applyFirmwarePath(context->settings()->cescFirmwarePath());
-    const auto initialState = m_uploader->state();
-    if (initialState == CescFirmwareUploader::State::Rebooting
-        || initialState == CescFirmwareUploader::State::ReadingVersion) {
-        m_progress->setRange(0, 0);
-    }
-    updateConnectionUi();
-    updateActions();
-    if (manager->state() == ConnectionState::Connected) {
-        context->cescSession()->setEnabled(true);
-        if (context->cescSession()->isReady()) {
-            m_uploader->requestFirmwareVersion();
-            m_angleStreamId = context->cescTelemetryClient()->activeStreamId();
-        }
-    }
+namespace{
+QFrame* card(QWidget*p){auto*f=new QFrame(p);f->setProperty("card",true);return f;}
+QLabel* value(const QString&s,QWidget*p){auto*l=new QLabel(s,p);l->setObjectName(QStringLiteral("telemetryValue"));return l;}
+void setup(QDoubleSpinBox*b,double lo,double hi,int decimals,double step,const QString&unit){b->setRange(lo,hi);b->setDecimals(decimals);b->setSingleStep(step);b->setSuffix(unit);b->setKeyboardTracking(false);b->setMinimumWidth(180);}
+QString powerName(quint8 v){switch(v){case 0:return QObject::tr("未初始化");case 1:return QObject::tr("校准中");case 2:return QObject::tr("就绪");case 3:return QObject::tr("运行中");case 4:return QObject::tr("故障");default:return QObject::tr("未知");}}
 }
 
-void CescToolPage::queryAngle()
-{
-    if (!m_context->cescSession()->isReady()) return;
-    m_context->cescSensorClient()->getSample();
+CescToolPage::CescToolPage(AppContext*c,QWidget*p):QWidget(p),m_context(c),m_uploader(c->cescFirmwareUploader()){
+ auto*root=new QVBoxLayout(this);root->setContentsMargins(22,18,22,22);root->setSpacing(12);
+ auto*head=new QHBoxLayout;auto*titles=new QVBoxLayout;auto*title=new QLabel(QStringLiteral("CESC Tool"),this);title->setObjectName(QStringLiteral("pageTitle"));auto*sub=new QLabel(tr("电机运行控制与设备持久化配置"),this);sub->setProperty("muted",true);titles->addWidget(title);titles->addWidget(sub);head->addLayout(titles);head->addStretch();m_badge=new QLabel(tr("CESC 未就绪"),this);m_badge->setProperty("statusBadge",true);head->addWidget(m_badge);root->addLayout(head);
+ auto*body=new QHBoxLayout;m_nav=new QListWidget(this);m_nav->setObjectName(QStringLiteral("cescSettingsNavigation"));m_nav->setFixedWidth(220);m_nav->addItems({tr("◆  Device & Firmware"),tr("    连接、识别与烧录"),tr("⚙  Motor Settings"),tr("    实时状态与控制"),tr("▣  App Settings"),tr("    电机与安全参数")});for(int i:{0,2,4}){auto*x=m_nav->item(i);QFont f=x->font();f.setBold(true);x->setFont(f);x->setFlags(x->flags()&~Qt::ItemIsSelectable);}body->addWidget(m_nav);m_stack=new QStackedWidget(this);m_stack->addWidget(devicePage());m_stack->addWidget(motorPage());m_stack->addWidget(appPage());body->addWidget(m_stack,1);root->addLayout(body,1);connect(m_nav,&QListWidget::currentRowChanged,this,[this](int i){if(i==1)m_stack->setCurrentIndex(0);if(i==3)m_stack->setCurrentIndex(1);if(i==5)m_stack->setCurrentIndex(2);});m_nav->setCurrentRow(1);
+ m_commandTimer=new QTimer(this);m_commandTimer->setInterval(150);m_stateTimer=new QTimer(this);m_stateTimer->setInterval(500);m_saveTimer=new QTimer(this);m_saveTimer->setInterval(250);m_alignmentTimer=new QTimer(this);m_alignmentTimer->setInterval(12000);m_alignmentTimer->setSingleShot(true);
+ auto*m=c->cescMotorClient();auto*cfg=c->cescConfigurationClient();connect(m_commandTimer,&QTimer::timeout,this,&CescToolPage::sendTarget);connect(m_stateTimer,&QTimer::timeout,this,[this,m]{m->requestState();m_context->cescSensorClient()->getSample();});connect(m_saveTimer,&QTimer::timeout,cfg,&CescConfigurationClient::requestSaveState);
+ connect(m_run,&QPushButton::clicked,this,[this]{if(m_running){stop();return;}const bool positionMode=m_mode->currentIndex()==3||m_mode->currentIndex()==4;if(positionMode&&m_positionReference->currentIndex()==0){if(!m_positionValid){m_context->cescSensorClient()->getSample();m_context->notify(tr("尚未取得当前位置，请稍后再试"),NotificationType::Warning);return;}m_lockedPositionTargetTurns=m_latestPositionTurns+m_position->value();}else if(positionMode){m_lockedPositionTargetTurns=m_position->value();}m_running=true;m_run->setText(tr("停止持续发送"));sendTarget();m_commandTimer->start();});connect(m_stop,&QPushButton::clicked,this,[this]{stop(true);});connect(m_mode,qOverload<int>(&QComboBox::currentIndexChanged),this,[this]{stop();updateMotorModeUi();});
+ connect(m_alignmentTimer,&QTimer::timeout,this,[this,m]{if(!m_alignmentPending)return;m_alignmentPending=false;m->stop();availability();m_alignmentStatus->setText(tr("⚠ 12 秒内未确认对齐结果 · %1；已停止，请检查设备状态后重试").arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"))));m_context->notify(tr("编码器对齐超时，已发送 STOP"),NotificationType::Warning);});
+ connect(m_align,&QPushButton::clicked,this,[this,m]{if(QMessageBox::warning(this,tr("编码器电角度对齐"),tr("对齐约需 9 秒，电机会转动。请释放负载并确认轴可自由旋转。"),QMessageBox::Ok|QMessageBox::Cancel,QMessageBox::Cancel)==QMessageBox::Ok){m_alignmentPending=true;m_alignmentSawCalibration=false;m_alignmentStartedMs=QDateTime::currentMSecsSinceEpoch();m_align->setEnabled(false);m_alignmentStatus->setText(tr("● 正在启动对齐（预计约 9 秒）…"));m_alignmentTimer->start();m->alignEncoder();}});
+ connect(m,&CescMotorClient::stateReceived,this,&CescToolPage::motorState);connect(m,&CescMotorClient::commandSucceeded,this,[this](quint8 command){if(command==0x03&&m_alignmentPending)m_alignmentStatus->setText(tr("● 正在对齐：电机将先正向、再反向缓慢扫角（约 9 秒）…"));});connect(m,&CescMotorClient::commandFailed,this,[this](quint8 command,const QString&s){if(command==0x03){m_alignmentPending=false;m_alignmentTimer->stop();availability();m_alignmentStatus->setText(tr("✕ 对齐失败 · %1 · %2").arg(s,QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"))));}stop();m_context->notify(s,NotificationType::Error);});
+ connect(m_read,&QPushButton::clicked,this,[this,cfg]{m_pendingConfigOperation=tr("读取设备");m_configOperation->setText(tr("● 正在读取设备配置…"));cfg->readConfiguration();});connect(m_write,&QPushButton::clicked,this,[this,cfg]{if(m_minVoltage->value()>=m_maxVoltage->value()){m_configOperation->setText(tr("● 参数错误：最低母线电压必须小于最高母线电压"));m_context->notify(tr("最低母线电压必须小于最高母线电压"),NotificationType::Error);return;}m_pendingConfigOperation=tr("写入 RAM");m_configOperation->setText(tr("● 正在校验并写入 RAM…"));cfg->writeRam(editorConfig());});connect(m_save,&QPushButton::clicked,this,[this,cfg]{m_pendingConfigOperation=tr("保存到 Flash");m_configOperation->setText(tr("● 正在请求保存到 Flash…"));cfg->saveFlash();});connect(m_reload,&QPushButton::clicked,this,[this,cfg]{m_pendingConfigOperation=tr("从 Flash 重载");m_configOperation->setText(tr("● 正在从 Flash 重载…"));cfg->reloadFlash();});connect(m_default,&QPushButton::clicked,this,[this,cfg]{if(QMessageBox::question(this,tr("恢复固件默认"),tr("仅恢复 RAM；需要再次保存到 Flash 才会永久生效。继续吗？"))==QMessageBox::Yes){m_pendingConfigOperation=tr("恢复固件默认");m_configOperation->setText(tr("● 正在恢复固件默认值…"));cfg->restoreDefaults();}});
+ connect(cfg,&CescConfigurationClient::configurationReceived,this,[this](const auto&configuration){m_configurationAvailable=true;availability();showConfig(configuration);if(!m_pendingConfigOperation.isEmpty()){m_configOperation->setText(tr("✓ %1成功 · %2").arg(m_pendingConfigOperation,QTime::currentTime().toString(QStringLiteral("HH:mm:ss"))));m_context->notify(tr("%1成功").arg(m_pendingConfigOperation),NotificationType::Success);m_pendingConfigOperation.clear();}m_context->cescConfigurationClient()->requestSaveState();});connect(cfg,&CescConfigurationClient::saveStateReceived,this,[this](const auto&state){m_configurationAvailable=true;availability();showSave(state);});connect(cfg,&CescConfigurationClient::commandFailed,this,[this](quint8,const QString&s){m_saveTimer->stop();m_configOperation->setText(tr("✕ %1失败 · %2 · %3").arg(m_pendingConfigOperation,s,QTime::currentTime().toString(QStringLiteral("HH:mm:ss"))));m_pendingConfigOperation.clear();m_context->notify(s,NotificationType::Error);});connect(cfg,&CescConfigurationClient::commandSucceeded,this,[this,cfg](quint8 cmd){m_configurationAvailable=true;availability();if(cmd==2){m_configOperation->setText(tr("✓ 写入 RAM 成功 · %1").arg(QTime::currentTime().toString(QStringLiteral("HH:mm:ss"))));m_pendingConfigOperation.clear();m_context->notify(tr("配置已写入 RAM"),NotificationType::Success);cfg->requestSaveState();}if(cmd==3){m_configOperation->setText(tr("● Flash 已接受请求，正在等待写入完成…"));m_saveTimer->start();}if(cmd==4||cmd==5){cfg->readConfiguration();cfg->requestSaveState();}});
+ connect(m_connectionButton,&QPushButton::clicked,this,[this]{auto*manager=m_context->connectionManager();if(manager->state()==ConnectionState::Connected||manager->state()==ConnectionState::Connecting){manager->disconnectTransport();return;}const auto serial=m_context->settings()->serialConfig();if(serial.portName.isEmpty()){m_context->notify(tr("请先在 Communication 页面选择串口"),NotificationType::Warning);return;}manager->connectTransport(TransportType::SerialPort,serial);});
+ connect(m_angleButton,&QPushButton::clicked,this,&CescToolPage::queryAngle);connect(m_streamButton,&QPushButton::clicked,this,&CescToolPage::toggleAngleStream);connect(m_choose,&QPushButton::clicked,this,&CescToolPage::chooseFirmware);connect(m_upload,&QPushButton::clicked,this,&CescToolPage::startUpload);connect(m_cancel,&QPushButton::clicked,m_uploader,&CescFirmwareUploader::cancel);
+ connect(c->cescSensorClient(),&CescSensorClient::sampleReceived,this,[this](const auto&s){m_angle->setText(QStringLiteral("%1°").arg(s.degrees,0,'f',2));m_rawAngle->setText(QString::number(s.rawAngle));m_sensorStatus->setText(QString::number(s.status));m_latestPositionTurns=s.positionDegrees/360.0;m_positionValid=true;if(m_currentPosition)m_currentPosition->setText(tr("当前位置：%1 圈（%2°）").arg(m_latestPositionTurns,0,'f',4).arg(s.positionDegrees,0,'f',1));const qint64 elapsed=QDateTime::currentMSecsSinceEpoch()-m_alignmentStartedMs;if(m_alignmentPending&&elapsed>=8800&&s.electricalZeroCalibrated){m_alignmentPending=false;m_alignmentTimer->stop();availability();m_alignmentStatus->setText(tr("✓ 上次对齐成功：%1 · 电角度零点 %2").arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"))).arg(s.electricalZeroRaw));m_context->notify(tr("编码器对齐完成"),NotificationType::Success);}});connect(c->cescSensorClient(),&CescSensorClient::commandFailed,this,[this](const QString&s){if(!m_stateTimer->isActive())m_context->notify(s,NotificationType::Error);});
+ connect(c->cescTelemetryClient(),&CescTelemetryClient::subscribed,this,[this](quint16 id){m_angleStreamId=id;m_streamStatus->setText(tr("遥测中 · ID %1 · 100 Hz").arg(id));updateDevice();});connect(c->cescTelemetryClient(),&CescTelemetryClient::commandFailed,this,[this](const QString&s){m_streamStatus->setText(s);m_context->notify(s,NotificationType::Error);updateDevice();});
+ connect(m_uploader,&CescFirmwareUploader::stateChanged,this,[this](auto state,int progress,const QString&text){const bool indeterminate=state==CescFirmwareUploader::State::Rebooting||state==CescFirmwareUploader::State::ReadingVersion;m_progress->setRange(0,indeterminate?0:100);if(!indeterminate)m_progress->setValue(progress);m_uploadStatus->setText(text);updateDevice();});connect(m_uploader,&CescFirmwareUploader::finished,this,[this](bool ok,const QString&s){m_context->notify(s,ok?NotificationType::Success:NotificationType::Error);});connect(m_uploader,&CescFirmwareUploader::firmwareVersionChanged,m_version,&QLabel::setText);
+ connect(c->connectionManager(),&ConnectionManager::stateChanged,this,[this]{if(m_context->connectionManager()->state()==ConnectionState::Connected)m_context->cescSession()->setEnabled(true);else if(m_context->connectionManager()->state()==ConnectionState::Disconnected){m_angleStreamId=0;m_configurationAvailable=false;m_streamStatus->setText(tr("遥测已停止"));}updateDevice();});connect(c->connectionManager(),&ConnectionManager::deviceNameChanged,this,&CescToolPage::updateDevice);connect(c->settings(),&AppSettings::cescFirmwarePathChanged,this,[this](const QString&s){if(!m_uploader->isBusy())applyFirmwarePath(s);});applyFirmwarePath(c->settings()->cescFirmwarePath());
+ connect(c->cescSession(),&CescSession::stateChanged,this,[this,m,cfg](auto s){if(s==CescSession::State::Ready){m_stateTimer->start();m->requestState();cfg->readConfiguration();cfg->requestSaveState();QTimer::singleShot(0,m_uploader,&CescFirmwareUploader::requestFirmwareVersion);}else{m_stateTimer->stop();m_saveTimer->stop();stop();}availability();});connect(c->cescSession(),&CescSession::identityChanged,this,&CescToolPage::availability);availability();if(c->connectionManager()->state()==ConnectionState::Connected)c->cescSession()->setEnabled(true);if(c->cescSession()->isReady()){m_stateTimer->start();m->requestState();cfg->readConfiguration();cfg->requestSaveState();m_uploader->requestFirmwareVersion();}
 }
+CescToolPage::~CescToolPage(){if(m_running&&m_context->cescSession()->isReady())m_context->cescMotorClient()->stop();}
 
-void CescToolPage::startAngleStream()
-{
-    if (!m_context->cescSession()->isReady()) return;
-    m_angleStreamId = m_context->cescTelemetryClient()->activeStreamId();
-    if (m_angleStreamId != 0U) return;
-    m_streamStatus->setText(tr("Starting..."));
-    m_context->cescTelemetryClient()->enumerate();
-    m_context->cescTelemetryClient()->subscribe({0U, 1U, 2U}, 10000U, 1U);
-    updateActions();
-}
+QWidget*CescToolPage::devicePage(){auto*content=new QWidget(this);auto*v=new QVBoxLayout(content);v->setContentsMargins(4,0,4,4);v->setSpacing(12);auto*t=new QLabel(tr("Device & Firmware"),content);t->setObjectName(QStringLiteral("pageTitle"));v->addWidget(t);auto*hint=new QLabel(tr("连接并识别 CESC、读取角度传感器、启动实时遥测，以及安全烧录固件。"),content);hint->setProperty("muted",true);v->addWidget(hint);
+ auto*d=card(content);auto*g=new QGridLayout(d);g->setContentsMargins(20,16,20,16);g->addWidget(new QLabel(tr("串口"),d),0,0);g->addWidget(new QLabel(tr("连接状态"),d),0,1);g->addWidget(new QLabel(tr("固件版本"),d),0,2);m_port=value(QStringLiteral("--"),d);m_connection=value(tr("未连接"),d);m_version=value(tr("未知"),d);g->addWidget(m_port,1,0);g->addWidget(m_connection,1,1);g->addWidget(m_version,1,2);m_connectionButton=new QPushButton(tr("连接"),d);g->addWidget(m_connectionButton,0,3,2,1);v->addWidget(d);
+ auto*a=card(content);auto*ag=new QGridLayout(a);ag->setContentsMargins(20,16,20,16);auto*at=new QLabel(tr("角度传感器与实时遥测"),a);at->setObjectName(QStringLiteral("sectionTitle"));ag->addWidget(at,0,0,1,6);ag->addWidget(new QLabel(tr("角度"),a),1,0);ag->addWidget(new QLabel(tr("原始值"),a),1,1);ag->addWidget(new QLabel(tr("传感器状态"),a),1,2);m_angle=value(QStringLiteral("--°"),a);m_rawAngle=value(QStringLiteral("--"),a);m_sensorStatus=value(tr("未知"),a);m_streamStatus=new QLabel(tr("遥测已停止"),a);m_streamStatus->setProperty("muted",true);ag->addWidget(m_angle,2,0);ag->addWidget(m_rawAngle,2,1);ag->addWidget(m_sensorStatus,2,2);ag->addWidget(m_streamStatus,2,3);m_angleButton=new QPushButton(tr("读取一次"),a);m_streamButton=new QPushButton(tr("启动遥测"),a);m_streamButton->setProperty("accent",true);ag->addWidget(m_angleButton,1,4,2,1);ag->addWidget(m_streamButton,1,5,2,1);auto*plot=new QLabel(tr("遥测启动后可在 Plot 页面选择 shaft_angle、shaft_angle_raw 和 shaft_sensor_status。"),a);plot->setWordWrap(true);plot->setProperty("muted",true);ag->addWidget(plot,3,0,1,6);v->addWidget(a);
+ auto*f=card(content);auto*fv=new QVBoxLayout(f);fv->setContentsMargins(20,18,20,18);auto*ft=new QLabel(tr("固件烧录"),f);ft->setObjectName(QStringLiteral("sectionTitle"));fv->addWidget(ft);auto*files=new QHBoxLayout;m_filePath=new QLineEdit(f);m_filePath->setReadOnly(true);m_filePath->setPlaceholderText(tr("请选择 .bin 固件文件"));m_choose=new QPushButton(tr("浏览…"),f);files->addWidget(m_filePath,1);files->addWidget(m_choose);fv->addLayout(files);m_fileInfo=new QLabel(tr("尚未选择固件"),f);m_fileInfo->setProperty("muted",true);fv->addWidget(m_fileInfo);m_progress=new QProgressBar(f);m_progress->setRange(0,100);m_progress->setValue(m_uploader->progress());m_uploadStatus=new QLabel(m_uploader->statusText().isEmpty()?tr("等待烧录"):m_uploader->statusText(),f);m_uploadStatus->setProperty("muted",true);fv->addWidget(m_progress);fv->addWidget(m_uploadStatus);auto*buttons=new QHBoxLayout;buttons->addStretch();m_cancel=new QPushButton(tr("取消"),f);m_upload=new QPushButton(tr("开始烧录"),f);m_upload->setProperty("accent",true);buttons->addWidget(m_cancel);buttons->addWidget(m_upload);fv->addLayout(buttons);auto*warning=new QLabel(tr("烧录期间请勿断开设备、关闭串口或退出程序。"),f);warning->setProperty("muted",true);fv->addWidget(warning);v->addWidget(f);v->addStretch();auto*scroll=new QScrollArea(this);scroll->setWidgetResizable(true);scroll->setWidget(content);return scroll;}
 
-void CescToolPage::stopAngleStream()
-{
-    if (m_angleStreamId != 0U) {
-        m_context->cescTelemetryClient()->unsubscribe(m_angleStreamId);
-        m_angleStreamId = 0U;
-    } else if (m_context->cescSession()->isReady()) {
-        m_context->cescTelemetryClient()->stopAll();
-    }
-    m_streamStatus->setText(tr("Stopped"));
-    updateActions();
-}
+QWidget*CescToolPage::motorPage(){auto*content=new QWidget(this);auto*v=new QVBoxLayout(content);v->setContentsMargins(4,0,4,4);auto*t=new QLabel(tr("Motor Settings"),content);t->setObjectName(QStringLiteral("pageTitle"));v->addWidget(t);auto*h=new QLabel(tr("运行命令每 150 ms 重发；通信或功率级异常时立即 STOP。正负方向取决于电机安装方向。"),content);h->setWordWrap(true);h->setProperty("muted",true);v->addWidget(h);
+ auto*s=card(content);auto*g=new QGridLayout(s);const QStringList n{tr("功率状态"),tr("母线电压"),tr("实际速度"),tr("Iq 电流"),tr("驱动故障"),tr("看门狗")};QLabel**out[]={&m_power,&m_voltage,&m_rpm,&m_iqNow,&m_fault,&m_timeout};for(int i=0;i<6;++i){g->addWidget(new QLabel(n[i],s),0,i);*out[i]=value(QStringLiteral("--"),s);g->addWidget(*out[i],1,i);}v->addWidget(s);
+ auto*c=card(content);auto*cv=new QVBoxLayout(c);auto*st=new QLabel(tr("运行控制"),c);st->setObjectName(QStringLiteral("sectionTitle"));cv->addWidget(st);m_mode=new QComboBox(c);m_mode->addItems({tr("Iq 电流"),tr("力矩"),tr("速度"),tr("位置"),tr("位置轨迹")});m_mode->setProperty("motorModeSelector",true);cv->addWidget(row(tr("控制模式"),tr("切换模式会先停止输出"),m_mode,c));m_modeHint=new QLabel(c);m_modeHint->setProperty("modeHint",true);m_modeHint->setWordWrap(true);cv->addWidget(m_modeHint);m_iq=new QDoubleSpinBox(c);setup(m_iq,-300,300,0,10,tr(" mA"));m_iqRow=row(tr("Iq 目标"),tr("q 轴电流目标"),m_iq,c);cv->addWidget(m_iqRow);m_torque=new QDoubleSpinBox(c);setup(m_torque,-69,69,0,1,tr(" mN·m"));m_torqueRow=row(tr("力矩目标"),tr("根据 Kt 换算"),m_torque,c);cv->addWidget(m_torqueRow);m_speed=new QDoubleSpinBox(c);setup(m_speed,-500,500,1,10,tr(" RPM"));m_speedRow=row(tr("速度目标"),tr("自动换算为 mdps"),m_speed,c);cv->addWidget(m_speedRow);m_positionReference=new QComboBox(c);m_positionReference->addItems({tr("相对转动（推荐）"),tr("绝对累计坐标")});m_positionReferenceRow=row(tr("位置基准"),tr("相对模式会在启动瞬间锁定当前位置"),m_positionReference,c);cv->addWidget(m_positionReferenceRow);m_currentPosition=new QLabel(tr("当前位置：等待编码器数据…"),c);m_currentPosition->setProperty("modeHint",true);cv->addWidget(m_currentPosition);m_position=new QDoubleSpinBox(c);setup(m_position,-10,10,3,.1,tr(" 圈"));m_positionRow=row(tr("转动圈数"),tr("正负号表示两个旋转方向"),m_position,c);cv->addWidget(m_positionRow);m_trajSpeed=new QDoubleSpinBox(c);setup(m_trajSpeed,.01,500,1,10,tr(" RPM"));m_trajSpeed->setValue(100);m_trajSpeedRow=row(tr("轨迹最高速度"),tr("位置轨迹模式的速度上限"),m_trajSpeed,c);cv->addWidget(m_trajSpeedRow);m_accel=new QDoubleSpinBox(c);setup(m_accel,100,600000,0,1000,tr(" mdps²"));m_accel->setValue(10000);m_accelRow=row(tr("加速度"),tr("位置轨迹的加速斜率"),m_accel,c);cv->addWidget(m_accelRow);m_decel=new QDoubleSpinBox(c);setup(m_decel,100,600000,0,1000,tr(" mdps²"));m_decel->setValue(10000);m_decelRow=row(tr("减速度"),tr("位置轨迹的减速斜率"),m_decel,c);cv->addWidget(m_decelRow);auto*a=new QHBoxLayout;m_run=new QPushButton(tr("▶ 开始持续发送"),c);m_run->setProperty("accent",true);m_stop=new QPushButton(tr("■ 急停 STOP"),c);m_stop->setProperty("danger",true);m_run->setMinimumHeight(38);m_stop->setMinimumHeight(38);a->addStretch();a->addWidget(m_run);a->addWidget(m_stop);cv->addLayout(a);v->addWidget(c);
+ auto*calibration=card(content);calibration->setProperty("calibrationCard",true);auto*cal=new QHBoxLayout(calibration);cal->setContentsMargins(18,14,18,14);auto*calText=new QVBoxLayout;auto*calTitle=new QLabel(tr("⚠ 编码器电角度对齐"),calibration);calTitle->setObjectName(QStringLiteral("sectionTitle"));auto*calDetail=new QLabel(tr("仅在首次安装或机械关系改变后执行。操作时电机会短暂转动，请先释放负载并确保轴可自由旋转。"),calibration);calDetail->setWordWrap(true);calDetail->setProperty("muted",true);m_alignmentStatus=new QLabel(tr("尚未在本次会话中执行对齐"),calibration);m_alignmentStatus->setProperty("alignmentStatus",true);calText->addWidget(calTitle);calText->addWidget(calDetail);calText->addWidget(m_alignmentStatus);cal->addLayout(calText,1);m_align=new QPushButton(tr("开始编码器对齐…"),calibration);m_align->setProperty("calibrationAction",true);m_align->setMinimumHeight(40);m_align->setCursor(Qt::PointingHandCursor);cal->addWidget(m_align);v->addWidget(calibration);v->addStretch();updateMotorModeUi();auto*scroll=new QScrollArea(this);scroll->setWidgetResizable(true);scroll->setWidget(content);return scroll;}
 
-void CescToolPage::chooseFirmware()
-{
-    const QString path = QFileDialog::getOpenFileName(
-        this, tr("选择固件文件"), m_context->settings()->cescFirmwareDirectory(),
-        tr("固件文件 (*.bin);;所有文件 (*)"));
-    if (path.isEmpty()) return;
-    m_context->settings()->setCescFirmwareDirectory(
-        QFileInfo(path).absolutePath());
-    applyFirmwarePath(path, true);
-}
+QWidget*CescToolPage::appPage(){auto*content=new QWidget(this);auto*v=new QVBoxLayout(content);v->setContentsMargins(4,0,4,4);auto*t=new QLabel(tr("App Settings"),content);t->setObjectName(QStringLiteral("pageTitle"));v->addWidget(t);auto*h=new QLabel(tr("先写入 RAM 验证参数，确认电机运行正常后再保存到 Flash。"),content);h->setProperty("muted",true);v->addWidget(h);auto*c=card(content);auto*cv=new QVBoxLayout(c);m_poles=new QSpinBox(c);m_poles->setRange(1,255);m_poles->setMinimumWidth(180);cv->addWidget(row(tr("极对数"),tr("机械角与电角度换算"),m_poles,c));m_kt=new QDoubleSpinBox(c);setup(m_kt,.0001,100,5,.01,tr(" N·m/A"));cv->addWidget(row(tr("力矩常数 Kt"),tr("力矩控制换算"),m_kt,c));m_resistance=new QDoubleSpinBox(c);setup(m_resistance,0,1000,5,.01,tr(" Ω"));cv->addWidget(row(tr("相电阻"),tr("FOC / 观测器模型"),m_resistance,c));m_inductance=new QDoubleSpinBox(c);setup(m_inductance,0,1000,4,.01,tr(" mH"));cv->addWidget(row(tr("相电感"),tr("界面 mH，协议 H"),m_inductance,c));m_flux=new QDoubleSpinBox(c);setup(m_flux,0,100,6,.001,tr(" Wb"));cv->addWidget(row(tr("磁链"),tr("观测器与反电动势模型"),m_flux,c));m_maxIq=new QSpinBox(c);m_maxIq->setRange(1,100000);m_maxIq->setSuffix(tr(" mA"));m_maxIq->setMinimumWidth(180);cv->addWidget(row(tr("最大 Iq"),tr("电流/力矩命令限幅"),m_maxIq,c));m_maxSpeed=new QDoubleSpinBox(c);setup(m_maxSpeed,.01,500000,1,10,tr(" RPM"));cv->addWidget(row(tr("最大速度"),tr("速度命令限幅"),m_maxSpeed,c));m_maxPosition=new QDoubleSpinBox(c);setup(m_maxPosition,.001,10000,3,1,tr(" 圈"));cv->addWidget(row(tr("最大累计位置"),tr("正负绝对位置对称限幅"),m_maxPosition,c));m_minVoltage=new QDoubleSpinBox(c);setup(m_minVoltage,0,1000,2,.1,tr(" V"));cv->addWidget(row(tr("最低母线电压"),tr("欠压保护"),m_minVoltage,c));m_maxVoltage=new QDoubleSpinBox(c);setup(m_maxVoltage,0,1000,2,.1,tr(" V"));cv->addWidget(row(tr("最高母线电压"),tr("过压保护"),m_maxVoltage,c));m_watchdog=new QSpinBox(c);m_watchdog->setRange(1,60000);m_watchdog->setSuffix(tr(" ms"));m_watchdog->setMinimumWidth(180);cv->addWidget(row(tr("命令看门狗"),tr("通信失联自动停机"),m_watchdog,c));v->addWidget(c);
+ auto*p=card(content);auto*pv=new QVBoxLayout(p);m_configOperation=new QLabel(tr("等待操作"),p);m_configOperation->setObjectName(QStringLiteral("configOperationStatus"));pv->addWidget(m_configOperation);m_saveText=new QLabel(tr("保存状态：--"),p);m_saveText->setWordWrap(true);pv->addWidget(m_saveText);auto*a=new QHBoxLayout;m_read=new QPushButton(tr("读取设备"),p);m_read->setObjectName(QStringLiteral("readConfigurationButton"));m_write=new QPushButton(tr("写入 RAM"),p);m_write->setObjectName(QStringLiteral("writeRamButton"));m_save=new QPushButton(tr("保存到 Flash"),p);m_save->setObjectName(QStringLiteral("saveFlashButton"));m_save->setProperty("accent",true);m_reload=new QPushButton(tr("从 Flash 重载"),p);m_reload->setObjectName(QStringLiteral("reloadFlashButton"));m_default=new QPushButton(tr("恢复固件默认"),p);m_default->setObjectName(QStringLiteral("restoreDefaultsButton"));for(auto*button:{m_read,m_write,m_save,m_reload,m_default}){button->setMinimumHeight(34);button->setCursor(Qt::PointingHandCursor);}a->addWidget(m_read);a->addWidget(m_write);a->addWidget(m_save);a->addStretch();a->addWidget(m_reload);a->addWidget(m_default);pv->addLayout(a);v->addWidget(p);v->addStretch();auto*scroll=new QScrollArea(this);scroll->setWidgetResizable(true);scroll->setWidget(content);return scroll;}
 
-void CescToolPage::applyFirmwarePath(
-    const QString &path, const bool notifyOnError)
-{
-    m_filePath->setText(path);
-    if (path.trimmed().isEmpty()) {
-        m_firmwareValid = false;
-        m_firmwareSize = 0;
-        m_fileInfo->setText(tr("尚未选择固件"));
-        updateActions();
-        return;
-    }
-    QString error;
-    m_firmwareValid = validateFirmware(path, &error);
-    if (m_firmwareValid) {
-        const QFileInfo info(path);
-        m_firmwareSize = info.size();
-        m_fileInfo->setText(tr("%1 · %2 KB").arg(info.fileName())
-                            .arg((info.size() + 1023) / 1024));
-        m_progress->setRange(0, 100);
-        m_progress->setValue(0);
-        m_status->setText(tr("固件已就绪"));
-    } else {
-        m_firmwareSize = 0;
-        m_fileInfo->setText(error);
-        m_status->setText(tr("默认固件无效：%1").arg(error));
-        if (notifyOnError) m_context->notify(error, NotificationType::Error);
-    }
-    updateActions();
-}
+QWidget*CescToolPage::row(const QString&name,const QString&desc,QWidget*editor,QWidget*parent){auto*r=new QFrame(parent);r->setProperty("settingRow",true);auto*h=new QHBoxLayout(r);h->setContentsMargins(8,5,8,5);auto*texts=new QVBoxLayout;auto*n=new QLabel(name,r);QFont f=n->font();f.setBold(true);n->setFont(f);auto*d=new QLabel(desc,r);d->setProperty("muted",true);texts->addWidget(n);texts->addWidget(d);h->addLayout(texts,1);h->addWidget(editor);return r;}
+void CescToolPage::availability(){bool ready=m_context->cescSession()->isReady();quint64 cap=m_context->cescSession()->capabilities();bool motor=ready&&(cap&Cesc::MotorService),cfg=ready&&((cap&Cesc::ConfigurationService)||m_configurationAvailable);m_badge->setText(ready?tr("已连接 · Session %1").arg(m_context->cescSession()->sessionId()):tr("CESC 未就绪"));const QList<QWidget*> motorWidgets{m_mode,m_run,m_stop};for(QWidget*w:motorWidgets)w->setEnabled(motor);m_align->setEnabled(motor&&!m_alignmentPending);const QList<QWidget*> configWidgets{m_read,m_write,m_save,m_reload,m_default};for(QWidget*w:configWidgets)w->setEnabled(cfg);updateDevice();}
+void CescToolPage::updateMotorModeUi(){if(!m_mode)return;const int mode=m_mode->currentIndex();m_iqRow->setVisible(mode==0);m_torqueRow->setVisible(mode==1);m_speedRow->setVisible(mode==2);const bool position=mode==3||mode==4;m_positionReferenceRow->setVisible(position);m_currentPosition->setVisible(position);m_positionRow->setVisible(position);const bool trajectory=mode==4;m_trajSpeedRow->setVisible(trajectory);m_accelRow->setVisible(trajectory);m_decelRow->setVisible(trajectory);const QStringList hints{tr("电流模式：只调节 Iq 目标。建议首次测试从 20 mA 开始。"),tr("力矩模式：只调节目标力矩，设备根据 App Settings 中的 Kt 换算电流。"),tr("速度模式：只调节目标转速。建议从 10 RPM 开始确认方向。"),tr("位置模式：推荐相对转动。启动时锁定当前位置，输入 1.000 就会完整转动一圈。"),tr("位置轨迹模式：相对圈数同样在启动时锁定，同时应用速度、加速度和减速度。")};m_modeHint->setText(hints.value(mode));}
+void CescToolPage::motorState(const CescMotorClient::State&s){m_power->setText(powerName(s.powerState));m_voltage->setText(QStringLiteral("%1 V").arg(s.busVoltageMv/1000.,0,'f',2));m_rpm->setText(QStringLiteral("%1 RPM").arg(s.speedActualMdps/6000.,0,'f',1));m_iqNow->setText(QStringLiteral("%1 mA").arg(s.iqMa));m_fault->setText(s.drvFaults?QStringLiteral("0x%1").arg(s.drvFaults,4,16,QLatin1Char('0')).toUpper():tr("正常"));m_timeout->setText(QStringLiteral("%1 ms").arg(s.timeoutRemainingMs));if(m_alignmentPending&&s.powerState==4){m_alignmentPending=false;m_alignmentTimer->stop();availability();m_alignmentStatus->setText(tr("✕ 对齐失败：设备进入故障 · %1").arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"))));}if((s.powerState==4||s.drvFaults||(s.flags&4)||!(s.flags&8))&&m_running){stop();m_context->notify(tr("检测到功率级或母线故障，已发送 STOP"),NotificationType::Error);}}
+void CescToolPage::sendTarget(){if(!m_context->cescSession()->isReady()){stop();return;}auto*m=m_context->cescMotorClient();switch(m_mode->currentIndex()){case 0:m->setIq(qRound(m_iq->value()));break;case 1:m->setTorque(qRound(m_torque->value()));break;case 2:m->setSpeed(qRound(m_speed->value()*6000));break;case 3:m->setPosition(qRound(m_lockedPositionTargetTurns*360000));break;case 4:m->setTrajectory(qRound(m_lockedPositionTargetTurns*360000),qRound(m_trajSpeed->value()*6000),qRound(m_accel->value()),qRound(m_decel->value()));break;}}
+void CescToolPage::stop(bool toast){m_commandTimer->stop();bool was=m_running;m_running=false;if(m_run)m_run->setText(tr("▶ 开始持续发送"));if(m_context->cescSession()->isReady())m_context->cescMotorClient()->stop();if(toast||was)m_context->notify(tr("已发送电机 STOP"),NotificationType::Information);}
+CescConfigurationClient::Configuration CescToolPage::editorConfig()const{CescConfigurationClient::Configuration c;c.polePairs=quint8(m_poles->value());c.torqueConstant=float(m_kt->value());c.phaseResistance=float(m_resistance->value());c.phaseInductance=float(m_inductance->value()/1000);c.fluxLinkage=float(m_flux->value());c.maximumIqMa=m_maxIq->value();c.maximumSpeedMdps=qRound(m_maxSpeed->value()*6000);c.maximumPositionMdeg=qRound(m_maxPosition->value()*360000);c.minimumBusVoltageMv=qRound(m_minVoltage->value()*1000);c.maximumBusVoltageMv=qRound(m_maxVoltage->value()*1000);c.watchdogMs=m_watchdog->value();return c;}
+void CescToolPage::showConfig(const CescConfigurationClient::Configuration&c){m_poles->setValue(c.polePairs);m_kt->setValue(c.torqueConstant);m_resistance->setValue(c.phaseResistance);m_inductance->setValue(c.phaseInductance*1000);m_flux->setValue(c.fluxLinkage);m_maxIq->setValue(c.maximumIqMa);m_maxSpeed->setValue(c.maximumSpeedMdps/6000.);m_maxPosition->setValue(c.maximumPositionMdeg/360000.);m_minVoltage->setValue(c.minimumBusVoltageMv/1000.);m_maxVoltage->setValue(c.maximumBusVoltageMv/1000.);m_watchdog->setValue(c.watchdogMs);}
+void CescToolPage::showSave(const CescConfigurationClient::SaveState&s){m_saveText->setText(tr("来源：%1 · %2 · 槽 A %3 / B %4 · 序号 %5 · %6").arg(s.source?tr("Flash"):tr("默认值")).arg(s.dirty?tr("RAM 有未保存修改"):tr("RAM 与 Flash 一致")).arg(s.slotAValid?tr("有效"):tr("无效")).arg(s.slotBValid?tr("有效"):tr("无效")).arg(s.sequence).arg(s.savePending?tr("正在保存"):s.lastSaveOk?tr("上次保存成功"):tr("尚无成功保存")));if(!s.savePending){m_saveTimer->stop();if(m_pendingConfigOperation==tr("保存到 Flash")){if(s.lastSaveOk&&!s.dirty){m_configOperation->setText(tr("✓ 保存到 Flash 成功 · %1").arg(QTime::currentTime().toString(QStringLiteral("HH:mm:ss"))));m_context->notify(tr("配置已保存到 Flash"),NotificationType::Success);}else{m_configOperation->setText(tr("✕ Flash 保存未成功 · %1").arg(QTime::currentTime().toString(QStringLiteral("HH:mm:ss"))));}m_pendingConfigOperation.clear();}}}
 
-bool CescToolPage::validateFirmware(const QString &path, QString *errorMessage)
-{
-    const QFileInfo info(path);
-    if (!info.exists() || !info.isFile()) { *errorMessage = tr("文件不存在"); return false; }
-    if (info.suffix().compare(QStringLiteral("bin"), Qt::CaseInsensitive) != 0) {
-        *errorMessage = tr("文件后缀必须为 .bin"); return false;
-    }
-    if (info.size() <= 0) { *errorMessage = tr("固件文件为空"); return false; }
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly)) {
-        *errorMessage = tr("文件无法读取：%1").arg(file.errorString()); return false;
-    }
-    return true;
-}
-
-void CescToolPage::startUpload()
-{
-    QString error;
-    if (!validateFirmware(m_filePath->text(), &error)) {
-        m_firmwareValid = false; m_status->setText(error); updateActions(); return;
-    }
-    auto *manager = m_context->connectionManager();
-    const QFileInfo info(m_filePath->text());
-    const QString prompt = tr("即将通过 %1 烧录 %2（%3 KB）。\n烧录过程中请勿断开设备或关闭串口。\n是否继续？")
-        .arg(manager->deviceName(), info.fileName())
-        .arg((info.size() + 1023) / 1024);
-    if (QMessageBox::question(this, tr("确认烧录固件"), prompt,
-                              QMessageBox::Yes | QMessageBox::Cancel,
-                              QMessageBox::Cancel) != QMessageBox::Yes) return;
-    QFile file(m_filePath->text());
-    if (!file.open(QIODevice::ReadOnly)) {
-        m_context->notify(tr("文件读取失败：%1").arg(file.errorString()), NotificationType::Error);
-        return;
-    }
-    m_uploader->start(file.readAll());
-    updateActions();
-}
-
-void CescToolPage::updateConnectionUi()
-{
-    auto *manager = m_context->connectionManager();
-    const SerialConfig serial = m_context->settings()->serialConfig();
-    const bool serialConnected = manager->state() == ConnectionState::Connected
-        && manager->transportType() == TransportType::SerialPort;
-    m_portValue->setText(serialConnected ? manager->deviceName()
-                                         : (serial.portName.isEmpty() ? tr("未选择") : serial.portName));
-    m_baudValue->setText(QString::number(serial.baudRate));
-    const auto sessionState = m_context->cescSession()->state();
-    m_connectionValue->setText(!serialConnected ? tr("传输未连接")
-        : sessionState == CescSession::State::Ready ? tr("CESC 已就绪")
-        : sessionState == CescSession::State::Negotiating ? tr("CESC 协商中")
-        : tr("传输已连接 / CESC 未就绪"));
-    m_versionValue->setText(m_uploader->firmwareVersion().isEmpty()
-        ? tr("未知") : m_uploader->firmwareVersion());
-    m_connectionButton->setText(serialConnected ? tr("断开") : tr("连接"));
-}
-
-void CescToolPage::updateActions()
-{
-    auto *manager = m_context->connectionManager();
-    const bool busy = m_uploader->isBusy();
-    const bool serialReady = manager->canSend()
-        && manager->transportType() == TransportType::SerialPort
-        && m_context->cescSession()->isReady()
-        && (m_context->cescSession()->capabilities() & Cesc::FirmwareUpdate);
-    m_chooseButton->setEnabled(!busy);
-    m_cancelButton->setEnabled(busy);
-    m_uploadButton->setEnabled(!busy && m_firmwareValid && serialReady);
-    m_connectionButton->setEnabled(!busy
-        && manager->state() != ConnectionState::Disconnecting);
-    const bool telemetryReady = !busy && m_context->cescSession()->isReady()
-        && (m_context->cescSession()->capabilities() & Cesc::TelemetryStreaming);
-    m_queryAngleButton->setEnabled(!busy && m_context->cescSession()->isReady()
-        && (m_context->cescSession()->capabilities() & Cesc::SensorService));
-    m_telemetryButton->setEnabled(telemetryReady);
-    m_telemetryButton->setText(m_angleStreamId == 0U
-        ? tr("Start telemetry") : tr("Stop telemetry"));
-}
+void CescToolPage::queryAngle(){if(m_context->cescSession()->isReady())m_context->cescSensorClient()->getSample();}
+void CescToolPage::toggleAngleStream(){auto*t=m_context->cescTelemetryClient();if(m_angleStreamId||t->activeStreamId()){if(m_angleStreamId)t->unsubscribe(m_angleStreamId);else t->stopAll();m_angleStreamId=0;m_streamStatus->setText(tr("遥测已停止"));}else if(m_context->cescSession()->isReady()){m_streamStatus->setText(tr("正在启动…"));t->enumerate();t->subscribe({0U,1U,2U},10000U,1U);}updateDevice();}
+void CescToolPage::chooseFirmware(){const QString path=QFileDialog::getOpenFileName(this,tr("选择固件文件"),m_context->settings()->cescFirmwareDirectory(),tr("固件文件 (*.bin);;所有文件 (*)"));if(path.isEmpty())return;m_context->settings()->setCescFirmwareDirectory(QFileInfo(path).absolutePath());applyFirmwarePath(path,true);}
+bool CescToolPage::validateFirmware(const QString&path,QString*error){QFileInfo info(path);if(!info.exists()||!info.isFile()){*error=tr("文件不存在");return false;}if(info.suffix().compare(QStringLiteral("bin"),Qt::CaseInsensitive)!=0){*error=tr("固件扩展名必须是 .bin");return false;}if(info.size()<=0){*error=tr("固件文件为空");return false;}QFile file(path);if(!file.open(QIODevice::ReadOnly)){*error=tr("无法读取文件：%1").arg(file.errorString());return false;}return true;}
+void CescToolPage::applyFirmwarePath(const QString&path,bool notify){m_filePath->setText(path);if(path.trimmed().isEmpty()){m_firmwareValid=false;m_fileInfo->setText(tr("尚未选择固件"));updateDevice();return;}QString error;m_firmwareValid=validateFirmware(path,&error);if(m_firmwareValid){QFileInfo info(path);m_fileInfo->setText(tr("%1 · %2 KB").arg(info.fileName()).arg((info.size()+1023)/1024));m_uploadStatus->setText(tr("固件已就绪"));}else{m_fileInfo->setText(error);if(notify)m_context->notify(error,NotificationType::Error);}updateDevice();}
+void CescToolPage::startUpload(){QString error;if(!validateFirmware(m_filePath->text(),&error)){m_firmwareValid=false;m_context->notify(error,NotificationType::Error);updateDevice();return;}QFileInfo info(m_filePath->text());if(QMessageBox::question(this,tr("确认烧录固件"),tr("即将烧录 %1（%2 KB）。烧录过程中请勿断开设备。是否继续？").arg(info.fileName()).arg((info.size()+1023)/1024),QMessageBox::Yes|QMessageBox::Cancel,QMessageBox::Cancel)!=QMessageBox::Yes)return;QFile file(m_filePath->text());if(!file.open(QIODevice::ReadOnly)){m_context->notify(file.errorString(),NotificationType::Error);return;}m_uploader->start(file.readAll());updateDevice();}
+void CescToolPage::updateDevice(){if(!m_connectionButton)return;auto*manager=m_context->connectionManager();auto session=m_context->cescSession();const bool connected=manager->state()==ConnectionState::Connected;const bool ready=session->isReady();const bool busy=m_uploader->isBusy();m_port->setText(connected?manager->deviceName():(m_context->settings()->serialConfig().portName.isEmpty()?tr("未选择"):m_context->settings()->serialConfig().portName));m_connection->setText(!connected?tr("传输未连接"):ready?tr("CESC 已识别"):tr("正在识别 CESC…"));m_version->setText(m_uploader->firmwareVersion().isEmpty()?tr("未知"):m_uploader->firmwareVersion());m_connectionButton->setText(connected?tr("断开"):tr("连接"));m_connectionButton->setEnabled(!busy&&manager->state()!=ConnectionState::Disconnecting);const quint64 cap=session->capabilities();m_angleButton->setEnabled(!busy&&ready&&(cap&Cesc::SensorService));m_streamButton->setEnabled(!busy&&ready&&(cap&Cesc::TelemetryStreaming));m_streamButton->setText((m_angleStreamId||m_context->cescTelemetryClient()->activeStreamId())?tr("停止遥测"):tr("启动遥测"));m_choose->setEnabled(!busy);m_cancel->setEnabled(busy);m_upload->setEnabled(!busy&&m_firmwareValid&&ready&&(cap&Cesc::FirmwareUpdate));}

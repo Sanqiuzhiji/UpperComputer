@@ -49,6 +49,10 @@ set(CESC_SOURCES
     src/services/cesc/CescSensorClient.cpp
     src/services/cesc/CescTelemetryClient.h
     src/services/cesc/CescTelemetryClient.cpp
+    src/services/cesc/CescMotorClient.h
+    src/services/cesc/CescMotorClient.cpp
+    src/services/cesc/CescConfigurationClient.h
+    src/services/cesc/CescConfigurationClient.cpp
 )
 
 set(PLOT_SOURCES

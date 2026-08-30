@@ -5,7 +5,12 @@ class CescSensorClient final:public QObject
 {
     Q_OBJECT
 public:
-    struct Sample{quint8 sensorId{},type{},status{};quint16 rawAngle{};float degrees{};quint64 timestampUs{};};
+    struct Sample{
+        quint8 sensorId{},type{},status{},polePairs{};
+        quint16 rawAngle{},electricalRawUnaligned{},electricalZeroRaw{},electricalRaw{};
+        float degrees{},positionDegrees{},electricalDegreesUnaligned{},electricalDegrees{};
+        quint64 timestampUs{};qint32 positionCounts{};bool electricalZeroCalibrated{};
+    };
     explicit CescSensorClient(CescSession*,QObject *parent=nullptr);
     void enumerate();void getSample(quint8 id=0);void getStatus(quint8 id=0);
 signals:

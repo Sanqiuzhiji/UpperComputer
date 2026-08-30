@@ -79,6 +79,40 @@ QString ThemeManager::styleSheet() const
         QPushButton:pressed, QToolButton:pressed { background: %5; }
         QPushButton[accent="true"] { background: #28A9E0; color: white; }
         QPushButton[accent="true"]:hover { background: #43B7E7; }
+        QPushButton:disabled, QToolButton:disabled {
+            color: %6; background: transparent; border-color: transparent;
+        }
+        QPushButton[accent="true"]:disabled {
+            color: %6; background: %5; border-color: %5;
+        }
+        QPushButton[danger="true"] { background: #E5484D; color: white; }
+        QPushButton[danger="true"]:hover { background: #F05B60; }
+        QLabel[statusBadge="true"] {
+            color: #28A9E0; background: %7; border: 1px solid %5;
+            border-radius: 10px; padding: 5px 10px;
+        }
+        QListWidget#cescSettingsNavigation {
+            background: %3; border: 1px solid %5; border-radius: 8px;
+            padding: 7px; outline: none;
+        }
+        QListWidget#cescSettingsNavigation::item { padding: 9px 8px; border-radius: 5px; }
+        QListWidget#cescSettingsNavigation::item:selected { background: #28A9E0; color: white; }
+        QListWidget#cescSettingsNavigation::item:hover { background: %7; }
+        QFrame[settingRow="true"] { border-bottom: 1px solid %5; }
+        QComboBox[motorModeSelector="true"] {
+            border: 2px solid #28A9E0; font-weight: 600; min-height: 28px;
+        }
+        QLabel[modeHint="true"] {
+            color: #28A9E0; background: %7; border-left: 3px solid #28A9E0;
+            border-radius: 4px; padding: 8px 10px;
+        }
+        QFrame[calibrationCard="true"] { border-left: 4px solid #F59E0B; }
+        QPushButton[calibrationAction="true"] {
+            background: transparent; color: #F59E0B; border: 1px solid #F59E0B;
+            font-weight: 600; padding: 8px 14px;
+        }
+        QPushButton[calibrationAction="true"]:hover { background: #F59E0B; color: #181A1F; }
+        QLabel[alignmentStatus="true"] { color: #F59E0B; font-weight: 600; }
         QToolButton[connectionQuick="true"]:checked {
             color: #28A9E0; background: %7; border-color: %5;
         }

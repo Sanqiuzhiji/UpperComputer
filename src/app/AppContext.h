@@ -13,6 +13,8 @@ class CescSession;
 class CescSystemClient;
 class CescSensorClient;
 class CescTelemetryClient;
+class CescMotorClient;
+class CescConfigurationClient;
 class IconManager;
 class ProtocolRepository;
 class ReceiveDataPipeline;
@@ -33,6 +35,8 @@ public:
     [[nodiscard]] CescSystemClient *cescSystemClient() const noexcept;
     [[nodiscard]] CescSensorClient *cescSensorClient() const noexcept;
     [[nodiscard]] CescTelemetryClient *cescTelemetryClient() const noexcept;
+    [[nodiscard]] CescMotorClient *cescMotorClient() const noexcept;
+    [[nodiscard]] CescConfigurationClient *cescConfigurationClient() const noexcept;
     [[nodiscard]] ThemeManager *themeManager() const noexcept;
     [[nodiscard]] IconManager *iconManager() const noexcept;
     [[nodiscard]] ProtocolRepository *protocolRepository() const noexcept;
@@ -52,6 +56,8 @@ private:
     CescSystemClient *m_cescSystemClient{};
     CescSensorClient *m_cescSensorClient{};
     CescTelemetryClient *m_cescTelemetryClient{};
+    CescMotorClient *m_cescMotorClient{};
+    CescConfigurationClient *m_cescConfigurationClient{};
     CescFirmwareUploader *m_cescFirmwareUploader{};
     ProtocolRepository *m_protocolRepository{};
     ChannelDataHub *m_channelDataHub{};
