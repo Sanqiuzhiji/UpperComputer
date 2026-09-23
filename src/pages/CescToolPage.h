@@ -13,7 +13,7 @@ private:
  QWidget* devicePage();QWidget* motorPage();QWidget* appPage();QWidget* row(const QString&,const QString&,QWidget*,QWidget*);
  void chooseFirmware();void startUpload();void queryAngle();void toggleAngleStream();
  void updateDevice();void applyFirmwarePath(const QString&,bool notify=false);bool validateFirmware(const QString&,QString*);
- void availability();void motorState(const CescMotorClient::State&);void updateMotorModeUi();void sendTarget();void stop(bool toast=false);
+ void initializeServices();void availability();void motorState(const CescMotorClient::State&);void updateMotorModeUi();void sendTarget();void stop(bool toast=false);
  CescConfigurationClient::Configuration editorConfig()const;void showConfig(const CescConfigurationClient::Configuration&);void showSave(const CescConfigurationClient::SaveState&);
  AppContext*m_context{};CescFirmwareUploader*m_uploader{};QListWidget*m_nav{};QStackedWidget*m_stack{};QLabel*m_badge{},*m_power{},*m_voltage{},*m_rpm{},*m_iqNow{},*m_fault{},*m_timeout{},*m_saveText{};
  QLabel*m_port{},*m_connection{},*m_version{},*m_angle{},*m_rawAngle{},*m_sensorStatus{},*m_streamStatus{},*m_fileInfo{},*m_uploadStatus{},*m_configOperation{},*m_modeHint{},*m_currentPosition{},*m_alignmentStatus{};

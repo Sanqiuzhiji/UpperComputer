@@ -1,4 +1,7 @@
 #include "app/AppContext.h"
+#include "app/AppSettings.h"
+#include "services/CescFirmwareUploader.h"
+#include "services/cesc/CescSession.h"
 #include "models/ProtocolDefinition.h"
 #include "pages/CommunicationPage.h"
 #include "pages/communication/CommunicationMonitorPanel.h"
@@ -417,6 +420,42 @@ int main(int argc, char *argv[])
         return 25;
     }
 
+    // Configuration errors must not terminate an unrelated version request.
+    ConnectionManager versionConnection;
+    AppSettings versionSettings;
+    CescSession versionSession(&versionConnection);
+    CescFirmwareUploader uploader(&versionConnection, &versionSettings, &versionSession);
+    versionSession.setEnabled(true);
+    versionConnection.stateChanged(ConnectionState::Connected);
+    QByteArray hello;
+    hello.append(char(1));
+    Cesc::appendU16(hello, 4096);
+    Cesc::appendU64(hello, Cesc::SensorService);
+    Cesc::appendU32(hello, 42);
+    versionSession.transactions()->completed(1, 0, 0, Cesc::Status::Ok, hello);
+    if (!versionSession.isReady()) return 26;
+    int completions = 0;
+    bool success = false;
+    QObject::connect(&uploader, &CescFirmwareUploader::finished,
+                     [&completions, &success](bool ok, const QString &) {
+        ++completions;
+        success = ok;
+    });
+    uploader.requestFirmwareVersion();
+    versionSession.transactions()->completed(2, 4, 1, Cesc::Status::NotSupported, {});
+    versionSession.transactions()->completed(3, 4, 6, Cesc::Status::NotSupported, {});
+    if (!uploader.isBusy() || completions != 0) return 27;
+    QByteArray info;
+    for (quint16 part : {1, 2, 3, 0, 0, 0}) Cesc::appendU16(info, part);
+    info.append(QByteArray(12, '\0'));
+    info.append(char(0));
+    info.append(char(0));
+    versionSession.transactions()->completed(4, 0, 1, Cesc::Status::Ok, info);
+    if (uploader.isBusy() || completions != 1 || !success
+        || !uploader.firmwareVersion().startsWith(QStringLiteral("1.2.3"))) return 28;
+    uploader.requestFirmwareVersion();
+    versionSession.transactions()->completed(5, 0, 1, Cesc::Status::NotSupported, {});
+    if (uploader.isBusy() || completions != 2 || success) return 29;
     context.connectionManager()->disconnectTransport();
     return 0;
 }
