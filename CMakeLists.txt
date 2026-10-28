@@ -50,6 +50,7 @@ set(CESC_SOURCES
     src/services/cesc/CescTelemetryClient.h
     src/services/cesc/CescTelemetryClient.cpp
     src/services/cesc/CescMotorClient.h
+    src/services/cesc/CescMotorTypes.h
     src/services/cesc/CescMotorClient.cpp
     src/services/cesc/CescConfigurationClient.h
     src/services/cesc/CescConfigurationClient.cpp
@@ -222,6 +223,7 @@ if(BUILD_TESTING)
 
     qt_add_executable(CescProtocolTest
         tests/CescProtocolTest.cpp
+        src/services/cesc/CescMotorTypes.h
         src/services/cesc/CescProtocolTypes.h
         src/services/cesc/CescPacketCodec.h
         src/services/cesc/CescPacketCodec.cpp

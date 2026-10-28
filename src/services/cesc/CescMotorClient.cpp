@@ -14,15 +14,8 @@ CescMotorClient::CescMotorClient(CescSession *session, QObject *parent)
             return;
         }
         if (command != 0x0f) { emit commandSucceeded(command); return; }
-        State s; qsizetype p = 0;
-        if (!Cesc::readU8(data,p,s.powerState) || !Cesc::readU8(data,p,s.flags)
-            || !Cesc::readU16(data,p,s.drvFaults) || !Cesc::readU32(data,p,s.busVoltageMv)
-            || !Cesc::readU8(data,p,s.controlMode) || !Cesc::readU8(data,p,s.speedCurrentFoc)
-            || !Cesc::readI32(data,p,s.speedTargetMdps) || !Cesc::readI32(data,p,s.speedReferenceMdps)
-            || !Cesc::readI32(data,p,s.speedActualMdps) || !Cesc::readI32(data,p,s.idMa)
-            || !Cesc::readI32(data,p,s.iqMa) || !Cesc::readI32(data,p,s.iqTargetMa)
-            || !Cesc::readU16(data,p,s.predictedElectricalRaw) || !Cesc::readU32(data,p,s.encoderAgeMs)
-            || !Cesc::readI16(data,p,s.predictionErrorRaw) || !Cesc::readU32(data,p,s.timeoutRemainingMs)) {
+        State s;
+        if (!Cesc::parseMotorState(data, s)) {
             emit commandFailed(command, tr("Malformed motor state response")); return;
         }
         emit stateReceived(s);

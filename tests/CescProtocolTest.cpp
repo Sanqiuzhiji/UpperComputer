@@ -1,5 +1,6 @@
 #include "services/cesc/CescPacketCodec.h"
 #include "services/cesc/CescTransactionManager.h"
+#include "services/cesc/CescMotorTypes.h"
 #include <QCoreApplication>
 #include <QEventLoop>
 #include <QTimer>
@@ -29,5 +30,21 @@ int main(int argc,char **argv)
     QObject::connect(&reentrant,&CescTransactionManager::completed,[&](quint16,quint8,quint8,Cesc::Status,const QByteArray &){ for(int i=0;i<8;++i) if(reentrant.request(0,quint8(i+1),{},100,0)) ++queued; });
     assert(reentrant.handleResponse({1,Cesc::MessageType::Response,0,0,hello,ok})); assert(queued==8); assert(reentrant.outstandingCount()==8);
     CescTransactionManager retry; QList<Cesc::Packet> attempts; QObject::connect(&retry,&CescTransactionManager::sendPacket,[&](const Cesc::Packet &v){attempts<<v;}); retry.request(1,1,"same",1,1); QEventLoop loop; QTimer::singleShot(20,&loop,&QEventLoop::quit); loop.exec(); assert(attempts.size()==2&&attempts[0]==attempts[1]);
+    auto motorState=[](qint16 deciC,quint8 temperatureStatus,quint8 faults,qint32 limit,bool valid=true){
+        QByteArray b(96,'\0');b[0]=char(2);b[1]=char(valid?0x18:0x08);
+        Cesc::appendU16(b,1234);Cesc::appendU16(b,quint16(deciC));b.append(char(temperatureStatus));b.append(char(faults));Cesc::appendI32(b,limit);return b;
+    };
+    Cesc::MotorState ms;const QByteArray legacy(96,'\0');assert(Cesc::parseMotorState(legacy,ms)&&!ms.boardTemperature.supported);
+    const auto normal=motorState(250,1,0,3000);assert(normal.size()==106&&Cesc::parseMotorState(normal,ms));assert(ms.boardTemperature.supported&&ms.boardTemperature.hasValue()&&ms.boardTemperature.raw==1234&&ms.boardTemperature.deciC==250&&ms.boardTemperature.currentLimitMa==3000);
+    assert(Cesc::parseMotorState(motorState(std::numeric_limits<qint16>::min(),1,0,0),ms)&&!ms.boardTemperature.hasValue());
+    assert(Cesc::parseMotorState(motorState(250,2,1,0),ms)&&ms.boardTemperature.sensorFault()&&ms.boardTemperature.status==Cesc::BoardTemperatureStatus::NtcOpen);
+    assert(Cesc::parseMotorState(motorState(250,3,1,0),ms)&&ms.boardTemperature.sensorFault()&&ms.boardTemperature.status==Cesc::BoardTemperatureStatus::NtcShort);
+    assert(Cesc::parseMotorState(motorState(850,1,0,2500),ms)&&ms.boardTemperature.deciC==850&&ms.boardTemperature.currentLimitMa==2500);
+    assert(Cesc::parseMotorState(motorState(1000,5,2,0),ms)&&ms.boardTemperature.thermalFault()&&(ms.boardTemperature.thermalFaults&2));
+    assert(Cesc::parseMotorState(motorState(250,1,1,0),ms)&&ms.boardTemperature.sensorFault());
+    assert(Cesc::parseMotorState(motorState(250,1,2,0),ms)&&ms.boardTemperature.thermalFault());
+    assert(!Cesc::parseMotorState(QByteArray(95,'\0'),ms));
+    assert(Cesc::parseMotorState(QByteArray(105,'\0'),ms)&&!ms.boardTemperature.supported);
+    Cesc::BoardTemperature diagnostic;QByteArray growing(137,'x');const auto tail=motorState(250,1,0,-123).right(10);growing.replace(growing.size()-10,10,tail);assert(Cesc::parsePowerStageTemperature(growing,true,diagnostic)&&diagnostic.currentLimitMa==-123);
     return 0;
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "services/cesc/CescProtocolTypes.h"
+#include "services/cesc/CescMotorTypes.h"
 #include <QObject>
 
 class CescSession;
@@ -9,14 +9,7 @@ class CescMotorClient final : public QObject
 {
     Q_OBJECT
 public:
-    struct State {
-        quint8 powerState{}, flags{}, controlMode{}, speedCurrentFoc{};
-        quint16 drvFaults{}, predictedElectricalRaw{};
-        quint32 busVoltageMv{}, encoderAgeMs{}, timeoutRemainingMs{};
-        qint32 speedTargetMdps{}, speedReferenceMdps{}, speedActualMdps{};
-        qint32 idMa{}, iqMa{}, iqTargetMa{};
-        qint16 predictionErrorRaw{};
-    };
+    using State = Cesc::MotorState;
     explicit CescMotorClient(CescSession *session, QObject *parent = nullptr);
     void stop();
     void alignEncoder();

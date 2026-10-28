@@ -628,7 +628,43 @@ uint32 sampleAgeUs
 uint32 ioErrorCount
 ```
 
+## 9A. Motor temperature extension (`0x05`)
+
+`GET_CONTROL_STATUS` (`0x0F`) keeps bytes 0..95 unchanged. A successful legacy response
+contains 96 data bytes. New firmware returns 106 bytes and appends this little-endian block:
+
+| Offset | Field | Type |
+|---:|---|---|
+| 96 | `boardTemperatureRaw` | `uint16` |
+| 98 | `boardTemperatureDeciC` (0.1 °C; `INT16_MIN` means invalid) | `int16` |
+| 100 | `boardTemperatureStatus` | `uint8` |
+| 101 | `thermalFaults` | `uint8` |
+| 102 | `thermalCurrentLimitMa` | `int32` |
+
+Flags byte offset 1 bit 4 indicates a valid board-temperature measurement. Temperature
+status values are 0 Uninitialized, 1 OK, 2 NTC open, 3 NTC short, 4 Invalid, and 5
+Overtemperature. `thermalFaults` bit 0 is a sensor fault and bit 1 is an overtemperature
+fault. Firmware begins linear current derating at 85 °C and shuts down with a latched
+fault at 100 °C.
+
+`GET_POWER_STAGE_STATUS` (`0x00`) appends the same block. Because fields before it may
+grow, readers must locate it at `response_data_length - 10`, never at a fixed absolute
+diagnostic offset.
+
 ## 10. Telemetry service (`0x03`)
+
+### Fixed motor-temperature channels
+
+Channels 0..2 retain their original definitions. New firmware also exposes:
+
+| Channel | Name | Type | Unit |
+|---:|---|---|---|
+| 3 | `board_temperature_raw` | `uint16` | `count` |
+| 4 | `board_temperature` | `float32` | `degC` |
+| 5 | `board_temperature_status` | `uint8` | `enum` |
+| 6 | `thermal_current_limit` | `int32` | `mA` |
+
+Temperature plotting should use a 100--500 ms subscription period.
 
 ### 10.1 Data types
 
